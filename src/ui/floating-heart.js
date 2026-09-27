@@ -9,7 +9,7 @@ import { updateHeartVisual } from "./heart-visual.js";
 import { heartSVG } from "./theme.js";
 
 // ═══ Floating heart - always visible on all osu! pages ═══
-// Visual language matches the rest of LOF's UI (flat dark surface, 1px
+// Visual language matches the rest of Local Favorites' UI (flat dark surface, 1px
 // hairline border, small radius, accent used sparingly) instead of the old
 // generic glowing-circle look.
 const IND_POS_KEY = "osu_fav_ind_pos"; // {right,bottom} px from bottom-right
