@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         osu! Local Favorites
-// @namespace    https://github.com/starhollow2008/osu-Local-Favorites
-// @updateURL    https://github.com/starhollow2008/osu-Local-Favorites/raw/refs/heads/main/dist/osu-local-favorites.user.js
-// @downloadURL  https://github.com/starhollow2008/osu-Local-Favorites/raw/refs/heads/main/dist/osu-local-favorites.user.js
+// @namespace    https://github.com/starhollow2008/Local-osu-favorites
+// @updateURL    https://github.com/starhollow2008/Local-osu-favorites/raw/refs/heads/main/dist/osu-local-favorites.user.js
+// @downloadURL  https://github.com/starhollow2008/Local-osu-favorites/raw/refs/heads/main/dist/osu-local-favorites.user.js
 // @version      5.9.1
-// @icon         https://github.com/starhollow2008/osu-Local-Favorites/blob/main/icons/icon48.png?raw=true
+// @icon         https://github.com/starhollow2008/Local-osu-favorites/blob/main/icons/icon48.png?raw=true
 // @description  Store osu! beatmap favorites locally instead of on osu!'s servers. Works without sign-in.
 // @author       Starhollow2008 | FlareonGhh
 // @match        https://osu.ppy.sh/*
@@ -692,7 +692,7 @@
   const PREVIEW_FULLSONG_KEY = "osu_preview_fullsong";
   const HINAI_MUSIC_API_BASE = "https://mirror.hinamizawa.ai/v3/osu/music";
   const HINAI_MUSIC_USER_AGENT =
-    "osu-Local-Favorites https://github.com/starhollow2008/osu-Local-Favorites";
+    "Local-osu-favorites https://github.com/starhollow2008/Local-osu-favorites";
   const _hinaiSongRequests = new Map();
 
   function isFirefoxAndroid() {
@@ -4606,9 +4606,9 @@
       aboutHint.style.cssText = "font-size:10px;color:#666;line-height:1.5;margin-bottom:8px";
       aboutHint.innerHTML =
         "osu! Local Favorites v" + getCurrentVersion() + " - " +
-        '<a href="https://github.com/starhollow2008/osu-Local-Favorites" target="_blank" rel="noopener" style="color:var(--osu-fav-accent);text-decoration:none">GitHub repository</a>' +
+        '<a href="https://github.com/starhollow2008/Local-osu-favorites" target="_blank" rel="noopener" style="color:var(--osu-fav-accent);text-decoration:none">GitHub repository</a>' +
         " &middot; " +
-        '<a href="https://github.com/starhollow2008/osu-Local-Favorites/issues" target="_blank" rel="noopener" style="color:var(--osu-fav-accent);text-decoration:none">Report an issue</a>';
+        '<a href="https://github.com/starhollow2008/Local-osu-favorites/issues" target="_blank" rel="noopener" style="color:var(--osu-fav-accent);text-decoration:none">Report an issue</a>';
       wrap.appendChild(aboutHint);
 
       const autoUpdateToggle = makeToggleSwitch(autoUpdateChecksEnabled(), (on) => {
@@ -4634,7 +4634,7 @@
               showToast("Update available: v" + latest + " - reinstall from the repo to update");
               setTimeout(() => {
                 window.open(
-                  "https://github.com/starhollow2008/LOF/raw/refs/heads/main/dist/osu-local-favorites.user.js",
+                  "https://github.com/starhollow2008/Local-osu-favorites/raw/refs/heads/main/dist/osu-local-favorites.user.js",
                   "_blank",
                 );
               }, 500);
@@ -5531,7 +5531,7 @@
       updateBtn.addEventListener("mouseleave", () => (updateBtn.style.background = "var(--osu-fav-accent)"));
       updateBtn.addEventListener("click", () => {
         window.open(
-          "https://github.com/starhollow2008/LOF/raw/refs/heads/main/dist/osu-local-favorites.user.js",
+          "https://github.com/starhollow2008/Local-osu-favorites/raw/refs/heads/main/dist/osu-local-favorites.user.js",
           "_blank",
         );
         backdrop.remove();
@@ -5561,7 +5561,7 @@
       "display:flex;align-items:center;gap:8px;margin-bottom:8px;height:34px;min-height:34px;box-sizing:border-box";
 
     const logoImg = document.createElement("img");
-    logoImg.src = "https://raw.githubusercontent.com/starhollow2008/LOF/main/icons/icon48.png";
+    logoImg.src = "https://raw.githubusercontent.com/starhollow2008/Local-osu-favorites/main/icons/icon48.png";
     logoImg.style.cssText = "width:28px;height:28px;border-radius:50%;flex-shrink:0";
     logoImg.addEventListener("error", () => logoImg.style.display = "none");
 
@@ -5647,7 +5647,7 @@
       starIcon.style.cssText = "font-size:13px;flex-shrink:0";
 
       const starLink = document.createElement("a");
-      starLink.href = "https://github.com/starhollow2008/LOF";
+      starLink.href = "https://github.com/starhollow2008/Local-osu-favorites";
       starLink.target = "_blank";
       starLink.rel = "noopener";
       starLink.textContent = "Enjoying Local Favorites? Star it on GitHub";
@@ -6887,7 +6887,7 @@
             }
             showOsuFavToast(`New version v${latestVersion} is available!`);
             window.open(
-              "https://github.com/starhollow2008/LOF/raw/refs/heads/main/dist/osu-local-favorites.user.js",
+              "https://github.com/starhollow2008/Local-osu-favorites/raw/refs/heads/main/dist/osu-local-favorites.user.js",
               "_blank",
             );
           } else {
@@ -7205,7 +7205,7 @@
       }
       GM_xmlhttpRequest({
         method: "GET",
-        url: "https://raw.githubusercontent.com/starhollow2008/LOF/refs/heads/main/dist/osu-local-favorites.user.js",
+        url: "https://raw.githubusercontent.com/starhollow2008/Local-osu-favorites/refs/heads/main/dist/osu-local-favorites.user.js",
         timeout: 10000,
         onload: function (response) {
           GM_setValue("osu_last_version_check", Date.now());
@@ -7332,7 +7332,7 @@
     updateBtn.addEventListener("mouseleave", () => (updateBtn.style.background = "var(--osu-fav-accent)"));
     updateBtn.addEventListener("click", () => {
       window.open(
-        "https://github.com/starhollow2008/LOF/raw/refs/heads/main/dist/osu-local-favorites.user.js",
+        "https://github.com/starhollow2008/Local-osu-favorites/raw/refs/heads/main/dist/osu-local-favorites.user.js",
         "_blank",
       );
       modal.remove();

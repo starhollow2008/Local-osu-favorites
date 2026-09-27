@@ -606,9 +606,9 @@ export function createSettingsView(deps) {
     aboutHint.style.cssText = "font-size:10px;color:#666;line-height:1.5;margin-bottom:8px";
     aboutHint.innerHTML =
       "osu! Local Favorites v" + getCurrentVersion() + " - " +
-      '<a href="https://github.com/starhollow2008/osu-Local-Favorites" target="_blank" rel="noopener" style="color:var(--osu-fav-accent);text-decoration:none">GitHub repository</a>' +
+      '<a href="https://github.com/starhollow2008/Local-osu-favorites" target="_blank" rel="noopener" style="color:var(--osu-fav-accent);text-decoration:none">GitHub repository</a>' +
       " &middot; " +
-      '<a href="https://github.com/starhollow2008/osu-Local-Favorites/issues" target="_blank" rel="noopener" style="color:var(--osu-fav-accent);text-decoration:none">Report an issue</a>';
+      '<a href="https://github.com/starhollow2008/Local-osu-favorites/issues" target="_blank" rel="noopener" style="color:var(--osu-fav-accent);text-decoration:none">Report an issue</a>';
     wrap.appendChild(aboutHint);
 
     const autoUpdateToggle = makeToggleSwitch(autoUpdateChecksEnabled(), (on) => {
@@ -635,7 +635,7 @@ export function createSettingsView(deps) {
             // Offer a one-click jump to the install URL
             setTimeout(() => {
               window.open(
-                "https://github.com/starhollow2008/LOF/raw/refs/heads/main/dist/osu-local-favorites.user.js",
+                "https://github.com/starhollow2008/Local-osu-favorites/raw/refs/heads/main/dist/osu-local-favorites.user.js",
                 "_blank",
               );
             }, 500);

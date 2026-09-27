@@ -7,7 +7,7 @@ import { getFavorites } from "../data/storage.js";
 // ═══ osu! API v2 - OAuth2 authorization-code flow ═══
 // Same mechanism standard osu! extensions use: the user creates an OAuth
 // application on their osu! account settings (new OAuth app), enters its
-// Client ID + Client Secret in LOF's settings, and registers exactly
+// Client ID + Client Secret in Local Favorites' settings, and registers exactly
 // https://osu.ppy.sh/home as the callback URL. The script
 // then drives the full flow itself:
 //   1. osuApiStartAuth()      → navigates to /oauth/authorize with a random state
@@ -276,7 +276,7 @@ export function osuApiHandleOAuthCallback() {
   } catch (e) { /* never break page load over this */ }
 }
 
-// Fetches a beatmapset through the API v2 and normalizes it into LOF's
+// Fetches a beatmapset through the API v2 and normalizes it into Local Favorites'
 // stored-favorite shape (identical fields to getBeatmapDataFromJSON - the
 // website's embedded JSON is basically the same object as the API payload).
 export function osuApiFetchBeatmapset(beatmapId) {

@@ -1834,7 +1834,7 @@ Not listed here, because they stay in the built file:
 // ═══ osu! API v2 - OAuth2 authorization-code flow ═══
 // Same mechanism standard osu! extensions use: the user creates an OAuth
 // application on their osu! account settings (new OAuth app), enters its
-// Client ID + Client Secret in LOF's settings, and registers exactly
+// Client ID + Client Secret in Local Favorites' settings, and registers exactly
 // https://osu.ppy.sh/home as the callback URL. The script
 // then drives the full flow itself:
 //   1. osuApiStartAuth()      → navigates to /oauth/authorize with a random state
@@ -2022,7 +2022,7 @@ Not listed here, because they stay in the built file:
 **[L2979](./osu-local-favorites.user.js#L2979)** · src L279
 
 ```js
-// Fetches a beatmapset through the API v2 and normalizes it into LOF's
+// Fetches a beatmapset through the API v2 and normalizes it into Local Favorites'
 // stored-favorite shape (identical fields to getBeatmapDataFromJSON - the
 // website's embedded JSON is basically the same object as the API payload).
 ```
@@ -2591,7 +2591,7 @@ Not listed here, because they stay in the built file:
 
 ```js
 // ═══ Floating heart - always visible on all osu! pages ═══
-// Visual language matches the rest of LOF's UI (flat dark surface, 1px
+// Visual language matches the rest of Local Favorites' UI (flat dark surface, 1px
 // hairline border, small radius, accent used sparingly) instead of the old
 // generic glowing-circle look.
 ```
