@@ -2,6 +2,8 @@
 *.log
 *.json
 
+# Kept as a local working note, not part of the published repo.
+BUILD.md
 
 # The original rule here was a blanket `*.json`, which now would swallow
 # package.json and build/modules.json - both of which the build needs.
