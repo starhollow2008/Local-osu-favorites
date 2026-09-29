@@ -164,7 +164,7 @@ export function showFavoritesPanel() {
     updateBtn.addEventListener("mouseleave", () => (updateBtn.style.background = "var(--osu-fav-accent)"));
     updateBtn.addEventListener("click", () => {
       window.open(
-        "https://github.com/starhollow2008/Local-osu-favorites/raw/refs/heads/main/dist/osu-local-favorites.user.js",
+        "https://github.com/starhollow2008/osu-local-favorites/raw/refs/heads/main/dist/osu-local-favorites.user.js",
         "_blank",
       );
       backdrop.remove();
@@ -195,7 +195,7 @@ export function showFavoritesPanel() {
     "display:flex;align-items:center;gap:8px;margin-bottom:8px;height:34px;min-height:34px;box-sizing:border-box";
 
   const logoImg = document.createElement("img");
-  logoImg.src = "https://raw.githubusercontent.com/starhollow2008/Local-osu-favorites/main/icons/icon48.png";
+  logoImg.src = "https://raw.githubusercontent.com/starhollow2008/osu-local-favorites/main/icons/icon48.png";
   logoImg.style.cssText = "width:28px;height:28px;border-radius:50%;flex-shrink:0";
   logoImg.addEventListener("error", () => logoImg.style.display = "none");
 
@@ -288,7 +288,7 @@ export function showFavoritesPanel() {
     starIcon.style.cssText = "font-size:13px;flex-shrink:0";
 
     const starLink = document.createElement("a");
-    starLink.href = "https://github.com/starhollow2008/Local-osu-favorites";
+    starLink.href = "https://github.com/starhollow2008/osu-local-favorites";
     starLink.target = "_blank";
     starLink.rel = "noopener";
     starLink.textContent = "Enjoying Local Favorites? Star it on GitHub";

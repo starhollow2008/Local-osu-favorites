@@ -24,7 +24,7 @@ try {
           }
           showOsuFavToast(`New version v${latestVersion} is available!`);
           window.open(
-            "https://github.com/starhollow2008/Local-osu-favorites/raw/refs/heads/main/dist/osu-local-favorites.user.js",
+            "https://github.com/starhollow2008/osu-local-favorites/raw/refs/heads/main/dist/osu-local-favorites.user.js",
             "_blank",
           );
         } else {

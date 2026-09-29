@@ -11,7 +11,7 @@ Replaces the default "Favorite" button on [osu.ppy.sh](https://osu.ppy.sh) with 
 ### Tampermonkey Userscript
 
 1. Install [Tampermonkey](https://www.tampermonkey.net/)
-2. **[Click here to install](https://github.com/starhollow2008/Local-osu-favorites/raw/refs/heads/main/dist/osu-local-favorites.user.js)** - Tampermonkey will open the installation page automatically.
+2. **[Click here to install](https://github.com/starhollow2008/osu-local-favorites/raw/refs/heads/main/dist/osu-local-favorites.user.js)** - Tampermonkey will open the installation page automatically.
 
 The script adds a **View Local Favorites** option in the Tampermonkey menu. Click it to open a side panel with all your favorites.
 
@@ -21,19 +21,19 @@ For a duration, seek timeline, and playback progress in Android's system media n
 
 Browser Extensions
 > **Heavily deprecated browser extension** 
-this is behind by about 2.0.3 major releases [122 commits behind check here](https://github.com/starhollow2008/Local-osu-favorites/compare/v3.4.2...main)
+this is behind by about 2.0.3 major releases [122 commits behind check here](https://github.com/starhollow2008/osu-local-favorites/compare/v3.4.2...main)
 > The old browser-extension build (`manifest.json`, `content.js`, `popup.*`, `background.js`, etc.) is no longer maintained or included in this repository - only the archived v3.4.2 release below still has those files. All active development happens on the Tampermonkey userscript.
 
-1. Download `osu-favorites-extension.zip` or `osu-favorites-extension.xpi` from the [last extension release](https://github.com/starhollow2008/Local-osu-favorites/releases/tag/v3.4.2)
+1. Download `osu-favorites-extension.zip` or `osu-favorites-extension.xpi` from the [last extension release](https://github.com/starhollow2008/osu-local-favorites/releases/tag/v3.4.2)
 2. Unzip
 3. Go to `chrome://extensions/`, enable Developer mode
 4. Click **Load unpacked** and select the unzipped folder
 
 For Firefox
-1. Download `osu-favorites-extension.xpi` from the [last extension release](https://github.com/starhollow2008/Local-osu-favorites/releases/tag/v3.4.2) (.xpi file)
+1. Download `osu-favorites-extension.xpi` from the [last extension release](https://github.com/starhollow2008/osu-local-favorites/releases/tag/v3.4.2) (.xpi file)
 2. To install it in Firefox go to `about:debugging` → `This Firefox` → `Load Temporary Add-on` → pick the .xpi file*(temporary - it will be removed after browser restart)*
 
-Or clone the repo and load it directly:```git clone https://github.com/starhollow2008/Local-osu-favorites.git``` Then load the folder in `chrome://extensions/`.
+Or clone the repo and load it directly:```git clone https://github.com/starhollow2008/osu-local-favorites.git``` Then load the folder in `chrome://extensions/`.
 
 ## Side Panel Demo
 
@@ -127,4 +127,4 @@ This is an ai-assisted project written mostly with help of Claude Code, extensio
 
 ## License
 
-[MIT](https://github.com/starhollow2008/Local-osu-favorites/blob/main/LICENSE)
+[MIT](https://github.com/starhollow2008/osu-local-favorites/blob/main/LICENSE)
