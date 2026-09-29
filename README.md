@@ -21,7 +21,7 @@ For a duration, seek timeline, and playback progress in Android's system media n
 
 Browser Extensions
 > **Heavily deprecated browser extension** 
-this is behind by about 2.0.3 major releases [122 commits behind check here](https://github.com/starhollow2008/osu-local-favorites/compare/v3.4.2...main)
+this is behind by about 2.5.1v releases [158 commits behind check here](https://github.com/starhollow2008/osu-local-favorites/compare/v3.4.2...main)
 > The old browser-extension build (`manifest.json`, `content.js`, `popup.*`, `background.js`, etc.) is no longer maintained or included in this repository - only the archived v3.4.2 release below still has those files. All active development happens on the Tampermonkey userscript.
 
 1. Download `osu-favorites-extension.zip` or `osu-favorites-extension.xpi` from the [last extension release](https://github.com/starhollow2008/osu-local-favorites/releases/tag/v3.4.2)
