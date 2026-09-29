@@ -121,6 +121,10 @@ Everything below lives behind the ⚙ **Settings** button in the side panel head
 - Only works on `osu.ppy.sh` beatmap pages
 - May need updates if osu! changes their page layout
 
+# AI And Quality Disclaimers: 
+
+This is an ai-assisted project written mostly with help of Claude Code, extension is being thoroughly tested by me with large loads since ver5.9.0 Versions before release(5.9.2) aren't sutable for proper use and were barely reviewed by me personally only parts that were rewiewed before that version were the ui quality and the request queve system, versions before 3-4.9 had entirely ai written ui thus resulting in near complete from scratch rewrite of ui by me and targetting of abysmall performance on load/opening with higher count of maps than 500+.
+
 ## License
 
 [MIT](https://github.com/starhollow2008/Local-osu-favorites/blob/main/LICENSE)
