@@ -1,3 +1,5 @@
+import { GM_setValue } from "../core/gm-shim.js";
+import { serializeFavorites } from "../data/storage.js";
 // ═══ GitHub Gist Backup ═══
 const GIST_FILENAME = "osu-local-favorites-backup.json";
 export const GH_TOKEN_KEY = "osu_github_token";
@@ -67,17 +69,49 @@ export function ghFindExistingGist(token) {
   });
 }
 
+// GitHub reports each gist's real visibility as a boolean `public` on the
+// gist object (list, get, create and update responses all carry it). This is
+// the source of truth - the stored GH_PRIVACY_KEY is only ever a mirror of it
+// for a linked gist, and only decides visibility for a gist not yet created.
+export function ghGistVisibility(gist) {
+  if (!gist || typeof gist.public !== "boolean") return null;
+  return gist.public ? "public" : "private";
+}
+
+// Links a gist as the backup target and adopts its real visibility, so the
+// Settings toggle shows what the gist actually is instead of a default.
+export function ghAdoptGist(gist) {
+  if (!gist || !gist.id) return null;
+  GM_setValue(GH_GIST_ID_KEY, gist.id);
+  GM_setValue(GH_GIST_URL_KEY, gist.html_url || "");
+  const visibility = ghGistVisibility(gist);
+  if (visibility) GM_setValue(GH_PRIVACY_KEY, visibility);
+  return visibility;
+}
+
+// Asks GitHub what a linked gist really is, and syncs the stored setting to
+// it. Resolves "public" | "private", or null when it could not be read
+// (offline, token revoked) - callers must treat null as "unknown" and leave
+// the setting alone rather than guess.
+export function ghDetectGistVisibility(token, gistId) {
+  return ghApiRequest("GET", "/gists/" + gistId, token).then((gist) => {
+    const visibility = ghGistVisibility(gist);
+    if (visibility) GM_setValue(GH_PRIVACY_KEY, visibility);
+    return visibility;
+  });
+}
+
 export function ghCreateGist(token, favs, isPublic) {
   return ghApiRequest("POST", "/gists", token, {
     description: "osu! Local Favorites backup",
     public: isPublic,
-    files: { [GIST_FILENAME]: { content: JSON.stringify(favs, null, 2) } },
+    files: { [GIST_FILENAME]: { content: serializeFavorites(favs) } },
   });
 }
 
 export function ghUpdateGist(token, gistId, favs) {
   return ghApiRequest("PATCH", "/gists/" + gistId, token, {
-    files: { [GIST_FILENAME]: { content: JSON.stringify(favs, null, 2) } },
+    files: { [GIST_FILENAME]: { content: serializeFavorites(favs) } },
   });
 }
 

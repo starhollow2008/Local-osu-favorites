@@ -1,5 +1,6 @@
 import { GM_getValue } from "../core/gm-shim.js";
 import { DL_SOURCE_PREF_KEY, DL_VIDEO_PREF_KEY, MIRRORS, isLoggedIn, isMirrorEnabled } from "../data/mirrors.js";
+import { createPopupMenu } from "./popup-menu.js";
 
 export function buildDownloadOptions(id) {
   const videoPref = GM_getValue(DL_VIDEO_PREF_KEY, "video");
@@ -35,42 +36,10 @@ export function buildDownloadOptions(id) {
 // on outside click, Escape, or if any ancestor (e.g. the panel list)
 // scrolls out from under it.
 export function showDownloadMenu(anchorEl, beatmapId) {
-  const existing = document.getElementById("osu-fav-dl-menu");
-  const reopening = existing && existing._anchor === anchorEl;
-  if (existing && existing._cleanup) existing._cleanup();
-  if (reopening) return; // Clicking the same button again just closes it
-
+  const popup = createPopupMenu(anchorEl, "osu-fav-dl-menu", "min-width:180px;max-width:240px;");
+  if (!popup) return;
+  const { menu, cleanup, show } = popup;
   const options = buildDownloadOptions(beatmapId);
-  const menu = document.createElement("div");
-  menu.id = "osu-fav-dl-menu";
-  menu._anchor = anchorEl;
-  menu.style.cssText =
-    "position:fixed;z-index:100002;min-width:180px;max-width:240px;" +
-    "background:#1a1a1a;border:1px solid #333;border-radius:4px;" +
-    "box-shadow:0 4px 16px rgba(0,0,0,.5);padding:4px;" +
-    "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif";
-
-  function cleanup() {
-    menu.remove();
-    document.removeEventListener("click", onOutsideClick, true);
-    document.removeEventListener("keydown", onKey, true);
-    window.removeEventListener("scroll", onWindowScroll, true);
-  }
-  function onOutsideClick(e) {
-    if (menu.contains(e.target)) return;
-    cleanup();
-  }
-  function onKey(e) {
-    if (e.key === "Escape") cleanup();
-  }
-  // Only close on a scroll that moves the menu's anchor out from under it
-  // (page/panel scroll) - a scroll *inside* the menu itself (e.g. the
-  // scrollable genre/tag or collections list) must not close it.
-  function onWindowScroll(e) {
-    if (menu.contains(e.target)) return;
-    cleanup();
-  }
-  menu._cleanup = cleanup;
 
   if (options.length === 0) {
     const empty = document.createElement("div");
@@ -100,23 +69,7 @@ export function showDownloadMenu(anchorEl, beatmapId) {
     });
   }
 
-  document.body.appendChild(menu);
-
-  // Position under the anchor, right-aligned, flipping above if it would
-  // overflow the bottom of the viewport
-  const rect = anchorEl.getBoundingClientRect();
-  const menuRect = menu.getBoundingClientRect();
-  let top = rect.bottom + 4;
-  if (top + menuRect.height > window.innerHeight) top = Math.max(8, rect.top - menuRect.height - 4);
-  let left = rect.right - menuRect.width;
-  left = Math.max(8, Math.min(left, window.innerWidth - menuRect.width - 8));
-  menu.style.top = top + "px";
-  menu.style.left = left + "px";
-
-  // Defer attaching so this same click doesn't immediately close the menu
-  setTimeout(() => document.addEventListener("click", onOutsideClick, true), 0);
-  document.addEventListener("keydown", onKey, true);
-  window.addEventListener("scroll", onWindowScroll, true);
+  show();
 }
 
 // ── Genre + Tags term collection ──

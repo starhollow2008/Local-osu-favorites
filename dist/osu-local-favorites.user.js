@@ -3,7 +3,7 @@
 // @namespace    https://github.com/starhollow2008/Local-osu-favorites
 // @updateURL    https://github.com/starhollow2008/Local-osu-favorites/raw/refs/heads/main/dist/osu-local-favorites.user.js
 // @downloadURL  https://github.com/starhollow2008/Local-osu-favorites/raw/refs/heads/main/dist/osu-local-favorites.user.js
-// @version      5.9.1
+// @version      5.9.2
 // @icon         https://github.com/starhollow2008/Local-osu-favorites/blob/main/icons/icon48.png?raw=true
 // @description  Store osu! beatmap favorites locally instead of on osu!'s servers. Works without sign-in.
 // @author       Starhollow2008 | FlareonGhh
@@ -42,30 +42,31 @@
  *   10. data/media-cache-db.js      (src/data/media-cache-db.js)
  *   11. ui/media-session.js         (src/ui/media-session.js)
  *   12. ui/audio-player.js          (src/ui/audio-player.js)
- *   13. ui/download-menu.js         (src/ui/download-menu.js)
- *   14. ui/genre-filter.js          (src/ui/genre-filter.js)
- *   15. ui/filter-menu.js           (src/ui/filter-menu.js)
- *   16. ui/filters.js               (src/ui/filters.js)
- *   17. ui/collections-menu.js      (src/ui/collections-menu.js)
- *   18. api/gist-backup.js          (src/api/gist-backup.js)
- *   19. api/osu-api.js              (src/api/osu-api.js)
- *   20. data/beatmap-extraction.js  (src/data/beatmap-extraction.js)
- *   21. data/favorite-detection.js  (src/data/favorite-detection.js)
- *   22. ui/heart-visual.js          (src/ui/heart-visual.js)
- *   23. data/enrichment.js          (src/data/enrichment.js)
- *   24. data/reenrichment.js        (src/data/reenrichment.js)
- *   25. data/toggle-favorite.js     (src/data/toggle-favorite.js)
- *   26. ui/copy-all-button.js       (src/ui/copy-all-button.js)
- *   27. ui/floating-heart.js        (src/ui/floating-heart.js)
- *   28. ui/settings.js              (src/ui/settings.js)
- *   29. ui/main-panel.js            (src/ui/main-panel.js)
- *   30. ui/menu-commands.js         (src/ui/menu-commands.js)
- *   31. ui/guest-fallback.js        (src/ui/guest-fallback.js)
- *   32. ui/guest-downloads.js       (src/ui/guest-downloads.js)
- *   33. core/toast.js               (src/core/toast.js)
- *   34. data/version-check.js       (src/data/version-check.js)
- *   35. ui/update-prompt.js         (src/ui/update-prompt.js)
- *   36. core/init.js                (src/core/init.js)
+ *   13. ui/popup-menu.js            (src/ui/popup-menu.js)
+ *   14. ui/download-menu.js         (src/ui/download-menu.js)
+ *   15. ui/genre-filter.js          (src/ui/genre-filter.js)
+ *   16. ui/filter-menu.js           (src/ui/filter-menu.js)
+ *   17. ui/filters.js               (src/ui/filters.js)
+ *   18. ui/collections-menu.js      (src/ui/collections-menu.js)
+ *   19. api/gist-backup.js          (src/api/gist-backup.js)
+ *   20. api/osu-api.js              (src/api/osu-api.js)
+ *   21. data/beatmap-extraction.js  (src/data/beatmap-extraction.js)
+ *   22. data/favorite-detection.js  (src/data/favorite-detection.js)
+ *   23. ui/heart-visual.js          (src/ui/heart-visual.js)
+ *   24. data/enrichment.js          (src/data/enrichment.js)
+ *   25. data/reenrichment.js        (src/data/reenrichment.js)
+ *   26. data/toggle-favorite.js     (src/data/toggle-favorite.js)
+ *   27. ui/copy-all-button.js       (src/ui/copy-all-button.js)
+ *   28. ui/floating-heart.js        (src/ui/floating-heart.js)
+ *   29. ui/settings.js              (src/ui/settings.js)
+ *   30. ui/main-panel.js            (src/ui/main-panel.js)
+ *   31. ui/menu-commands.js         (src/ui/menu-commands.js)
+ *   32. ui/guest-fallback.js        (src/ui/guest-fallback.js)
+ *   33. ui/guest-downloads.js       (src/ui/guest-downloads.js)
+ *   34. core/toast.js               (src/core/toast.js)
+ *   35. data/version-check.js       (src/data/version-check.js)
+ *   36. ui/update-prompt.js         (src/ui/update-prompt.js)
+ *   37. core/init.js                (src/core/init.js)
  */
 (() => {
   "use strict";
@@ -437,6 +438,22 @@
   function isFavorited(id) {
     return !!getFavorites()[id];
   }
+
+  function favoriteCoverUrl(f, id) {
+    const c = (f && f.covers) || {};
+    return c.card || c["card@2x"] || c.list || c.cover ||
+      (id ? `https://assets.ppy.sh/beatmaps/${id}/covers/card.jpg` : "");
+  }
+
+  function serializeFavorites(favs) {
+    const slim = {};
+    for (const [id, { covers, ...rest }] of Object.entries(favs)) {
+      if (!rest.source) delete rest.source;
+      if (!rest.tags) delete rest.tags;
+      slim[id] = rest;
+    }
+    return JSON.stringify(slim, null, 2);
+  }
   // ━━━━━━━━━━ src/data/collections.js ━━━━━━━━━━
 
   const COLLECTIONS_KEY = "osu_fav_collections";
@@ -692,7 +709,7 @@
   const PREVIEW_FULLSONG_KEY = "osu_preview_fullsong";
   const HINAI_MUSIC_API_BASE = "https://mirror.hinamizawa.ai/v3/osu/music";
   const HINAI_MUSIC_USER_AGENT =
-    "Local-osu-favorites https://github.com/starhollow2008/Local-osu-favorites";
+    "osu-Local-Favorites https://github.com/starhollow2008/Local-osu-favorites";
   const _hinaiSongRequests = new Map();
 
   function isFirefoxAndroid() {
@@ -813,6 +830,33 @@
   const CACHE_STORE = "media";
   const CACHE_DB_VERSION = 2;
   const CHUNK_STORE = "media-chunks";
+  const CACHE_SIZE_KEY = "osu_cache_max_size";
+  const CACHE_SIZE_CUSTOM_MB_KEY = "osu_cache_max_size_custom_mb";
+  const MB = 1024 * 1024;
+  const CACHE_SIZES_MB = {
+    "100mb": 100,
+    "250mb": 250,
+    "512mb": 512,
+    "1gb": 1024,
+    "2gb": 2 * 1024,
+    "5gb": 5 * 1024,
+  };
+  function cacheSizeMode() {
+    return GM_getValue(CACHE_SIZE_KEY, "512mb");
+  }
+  function cacheSizeCustomMb() {
+    const n = Number(GM_getValue(CACHE_SIZE_CUSTOM_MB_KEY, 512));
+    return Number.isFinite(n) && n > 0 ? n : 512;
+  }
+  function cacheMaxBytes() {
+    const mode = cacheSizeMode();
+    if (mode === "unlimited") return Infinity;
+    if (mode === "custom") return cacheSizeCustomMb() * MB;
+    return (CACHE_SIZES_MB[mode] || CACHE_SIZES_MB["512mb"]) * MB;
+  }
+  const CACHE_PRUNE_TARGET = 0.85;
+  const PARTIAL_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+  const PRUNE_MIN_INTERVAL_MS = 60 * 1000;
   let _cacheDbPromise = null;
   const _forgotten = new Set();
   function openCacheDb() {
@@ -829,7 +873,10 @@
             req.result.createObjectStore(CHUNK_STORE, { keyPath: "key" });
           }
         };
-        req.onsuccess = () => resolve(req.result);
+        req.onsuccess = () => {
+          resolve(req.result);
+          setTimeout(() => { pruneMediaCache().catch(() => {}); }, 10000);
+        };
         req.onerror = () => resolve(null);
         req.onblocked = () => resolve(null);
       } catch (e) {
@@ -852,14 +899,27 @@
       });
     });
   }
+  function _putEntry(db, url, blob) {
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction(CACHE_STORE, "readwrite");
+        tx.objectStore(CACHE_STORE).put({ url, blob, cachedAt: Date.now() });
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+        tx.onabort = () => resolve(false);
+      } catch (e) {
+        resolve(false);
+      }
+    });
+  }
   function cachePut(url, blob) {
     return openCacheDb().then((db) => {
-      if (!db) return;
-      try {
-        _forgotten.delete(url);
-        db.transaction(CACHE_STORE, "readwrite").objectStore(CACHE_STORE).put({ url, blob, cachedAt: Date.now() });
-      } catch (e) {
-      }
+      if (!db || !blob) return false;
+      _forgotten.delete(url);
+      return _putEntry(db, url, blob).then((ok) => {
+        if (ok) return true;
+        return _makeRoom(db, blob.size).then((freed) => (freed ? _putEntry(db, url, blob) : false));
+      });
     });
   }
   function cacheClearAll() {
@@ -879,6 +939,108 @@
       });
     });
   }
+  function _getAllRows(db, storeName) {
+    return new Promise((resolve) => {
+      try {
+        const req = db.transaction(storeName, "readonly").objectStore(storeName).getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => resolve([]);
+      } catch (e) {
+        resolve([]);
+      }
+    });
+  }
+  function _deleteKeys(db, storeName, keys) {
+    if (!keys.length) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction(storeName, "readwrite");
+        const store = tx.objectStore(storeName);
+        keys.forEach((k) => store.delete(k));
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+        tx.onabort = () => resolve(false);
+      } catch (e) {
+        resolve(false);
+      }
+    });
+  }
+  function _pickEvictions(rows, bytesToFree) {
+    const picked = [];
+    let freed = 0;
+    rows
+      .filter((r) => r && r.blob && !_blobUrlCache.has(r.url))
+      .sort((a, b) => (a.cachedAt || 0) - (b.cachedAt || 0))
+      .some((r) => {
+        picked.push(r.url);
+        freed += r.blob.size;
+        return freed >= bytesToFree;
+      });
+    return { picked, freed };
+  }
+  function _makeRoom(db, bytes) {
+    return _getAllRows(db, CACHE_STORE).then((rows) => {
+      const { picked, freed } = _pickEvictions(rows, Math.max(bytes || 0, 1));
+      picked.forEach((u) => _memBlobs.delete(u));
+      return _deleteKeys(db, CACHE_STORE, picked).then((ok) => (ok ? freed : 0));
+    });
+  }
+
+  let _lastPruneAt = 0;
+  let _pruneRunning = null;
+  function pruneMediaCache(force) {
+    if (_pruneRunning) return _pruneRunning;
+    if (!force && Date.now() - _lastPruneAt < PRUNE_MIN_INTERVAL_MS) return Promise.resolve();
+    _lastPruneAt = Date.now();
+    _pruneRunning = openCacheDb()
+      .then((db) => {
+        if (!db) return;
+        return Promise.all([_getAllRows(db, CACHE_STORE), _getAllRows(db, CHUNK_STORE)]).then(([rows, chunkRows]) => {
+          const now = Date.now();
+          const mode = cacheDurationMode();
+          const ttl = mode === "never" ? Infinity : cacheDurationMs();
+
+          const expired = rows.filter((r) => ttl !== Infinity && now - (r.cachedAt || 0) >= ttl && !_blobUrlCache.has(r.url));
+          const expiredSet = new Set(expired.map((r) => r.url));
+          expired.forEach((r) => _memBlobs.delete(r.url));
+
+          const complete = new Set(rows.map((r) => r.url));
+          const byUrl = new Map();
+          chunkRows.forEach((r) => {
+            const g = byUrl.get(r.url) || { newest: 0, bytes: 0 };
+            g.newest = Math.max(g.newest, r.savedAt || 0);
+            g.bytes += r.blob ? r.blob.size : 0;
+            byUrl.set(r.url, g);
+          });
+          const dropChunkUrls = [];
+          let partialKept = 0;
+          byUrl.forEach((g, url) => {
+            const abandoned = now - g.newest >= PARTIAL_MAX_AGE_MS;
+            if ((abandoned || complete.has(url)) && !_activeStreamWrites.has(url)) dropChunkUrls.push(url);
+            else partialKept += g.bytes;
+          });
+
+          const remaining = rows.filter((r) => !expiredSet.has(r.url));
+          const total = remaining.reduce((n, r) => n + (r.blob ? r.blob.size : 0), 0) + partialKept;
+          let evicted = [];
+          const maxBytes = cacheMaxBytes();
+          if (maxBytes !== Infinity && total > maxBytes) {
+            evicted = _pickEvictions(remaining, total - maxBytes * CACHE_PRUNE_TARGET).picked;
+            evicted.forEach((u) => _memBlobs.delete(u));
+          }
+
+          const dropEntries = expired.map((r) => r.url).concat(evicted);
+          const chunkKeys = chunkRows.filter((r) => dropChunkUrls.indexOf(r.url) !== -1).map((r) => r.key);
+          return _deleteKeys(db, CACHE_STORE, dropEntries).then(() => _deleteKeys(db, CHUNK_STORE, chunkKeys));
+        });
+      })
+      .catch(() => {})
+      .then(() => {
+        _pruneRunning = null;
+      });
+    return _pruneRunning;
+  }
+
   function cacheStats() {
     return openCacheDb().then((db) => {
       if (!db) return { count: 0, bytes: 0 };
@@ -976,6 +1138,34 @@
     });
   }
 
+  const BG_FETCH_CONCURRENCY = 4;
+  const _bgFetches = new Map();
+  const _bgWaiting = [];
+  let _bgActive = 0;
+  function _backgroundCacheFetch(url) {
+    const existing = _bgFetches.get(url);
+    if (existing) return existing;
+    const promise = new Promise((resolve) => {
+      const run = () => {
+        _bgActive++;
+        gmFetchBlob(url)
+          .then((blob) => (blob ? cachePut(url, blob) : false))
+          .catch(() => false)
+          .then((stored) => {
+            _bgActive--;
+            _bgFetches.delete(url);
+            const next = _bgWaiting.shift();
+            if (next) next();
+            resolve(stored);
+          });
+      };
+      if (_bgActive < BG_FETCH_CONCURRENCY) run();
+      else _bgWaiting.push(run);
+    });
+    _bgFetches.set(url, promise);
+    return promise;
+  }
+
   function resolveCachedMediaUrl(url) {
     if (!url) return Promise.resolve(url);
     if (cacheDurationMode() === "never") return Promise.resolve(url);
@@ -990,9 +1180,8 @@
         return objUrl;
       }
 
-      gmFetchBlob(url).then((blob) => {
-        if (!blob) return;
-        cachePut(url, blob);
+      _backgroundCacheFetch(url).then((stored) => {
+        if (!stored) return;
         const stale = _blobUrlCache.get(url);
         if (stale) {
           URL.revokeObjectURL(stale);
@@ -1149,12 +1338,14 @@
   function _wholeFileFallback(db, url) {
     return gmFetchBlob(url).then((blob) => {
       if (!blob) return false;
-      return cachePut(url, blob)
-        .then(() => _deleteChunks(db, url))
-        .then(() => {
+      return cachePut(url, blob).then((stored) => {
+        if (!stored) return false;
+        return _deleteChunks(db, url).then(() => {
           _rememberCachedBlob(url, blob);
+          pruneMediaCache();
           return true;
         });
+      });
     });
   }
 
@@ -1189,17 +1380,35 @@
       const reader = response.body.getReader();
       let pending = [];
       let pendingBytes = 0;
+      let received = 0;
+      let writeFailed = false;
       const flushPending = async () => {
-        if (!pending.length) return;
-        const batch = pending;
+        if (!pending.length || writeFailed) return;
+        const pieces = pending;
+        const size = pendingBytes;
         pending = [];
         pendingBytes = 0;
+        const index = nextIndex++;
+        const row = {
+          key: _chunkKey(url, index),
+          url,
+          index,
+          blob: new Blob(pieces, { type: contentType }),
+          contentType,
+          etag,
+          savedAt: Date.now(),
+        };
+        let ok = await _writeChunkRows(db, [row]);
+        if (!ok && (await _makeRoom(db, size))) ok = await _writeChunkRows(db, [row]);
+        if (!ok) {
+          writeFailed = true;
+          return;
+        }
         wroteAnything = true;
-        await _writeChunkRows(db, batch);
       };
 
       for (;;) {
-        if (state.cancelled || !isStillWanted()) {
+        if (state.cancelled || !isStillWanted() || writeFailed) {
           controller.abort();
           await flushPending();
           return false;
@@ -1207,26 +1416,24 @@
         const { value, done } = await reader.read();
         if (done) break;
         if (!value || !value.byteLength) continue;
-        const index = nextIndex++;
-        pending.push({
-          key: _chunkKey(url, index),
-          url,
-          index,
-          blob: new Blob([value], { type: contentType }),
-          contentType,
-          etag,
-        });
+        pending.push(value);
         pendingBytes += value.byteLength;
+        received += value.byteLength;
         if (pendingBytes >= CHUNK_FLUSH_BYTES) await flushPending();
       }
       await flushPending();
+      if (writeFailed) return false;
+
+      const declared = Number(response.headers.get("content-length"));
+      if (declared > 0 && !response.headers.get("content-encoding") && received !== declared) return false;
 
       const total = await _readChunks(db, url);
       if (!total.chunks.length) return false;
       const blob = new Blob(total.chunks.map((r) => r.blob), { type: total.contentType || contentType });
-      await cachePut(url, blob);
+      if (!(await cachePut(url, blob))) return false;
       await _deleteChunks(db, url);
       _rememberCachedBlob(url, blob);
+      pruneMediaCache();
       return true;
     } catch (e) {
       if (state.cancelled) return false;
@@ -1290,10 +1497,6 @@
   function mediaSession() {
     if (typeof navigator === "undefined") return null;
     return "mediaSession" in navigator && navigator.mediaSession ? navigator.mediaSession : null;
-  }
-
-  function mediaSessionAvailable() {
-    return mediaSession() !== null;
   }
 
   const OSU_COVER_SIZES = [
@@ -1707,6 +1910,48 @@
     stopPlayback(audio);
   }
 
+  // ━━━━━━━━━━ src/ui/popup-menu.js ━━━━━━━━━━
+
+  function createPopupMenu(anchorEl, id, css) {
+    const existing = document.getElementById(id);
+    const reopening = existing && existing._anchor === anchorEl;
+    if (existing && existing._cleanup) existing._cleanup();
+    if (reopening) return null;
+
+    const menu = document.createElement("div");
+    menu.id = id;
+    menu._anchor = anchorEl;
+    menu.style.cssText =
+      "position:fixed;z-index:100002;" + css +
+      "background:#1a1a1a;border:1px solid #333;border-radius:4px;" +
+      "box-shadow:0 4px 16px rgba(0,0,0,.5);padding:4px;" +
+      "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif";
+
+    const dismiss = (e) => { if (!menu.contains(e.target)) cleanup(); };
+    const onKey = (e) => { if (e.key === "Escape") cleanup(); };
+    function cleanup() {
+      menu.remove();
+      document.removeEventListener("click", dismiss, true);
+      document.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("scroll", dismiss, true);
+    }
+    menu._cleanup = cleanup;
+
+    function show({ alignLeft = false } = {}) {
+      document.body.appendChild(menu);
+      const rect = anchorEl.getBoundingClientRect();
+      const menuRect = menu.getBoundingClientRect();
+      let top = rect.bottom + 4;
+      if (top + menuRect.height > window.innerHeight) top = Math.max(8, rect.top - menuRect.height - 4);
+      const left = alignLeft ? rect.left : rect.right - menuRect.width;
+      menu.style.top = top + "px";
+      menu.style.left = Math.max(8, Math.min(left, window.innerWidth - menuRect.width - 8)) + "px";
+      setTimeout(() => document.addEventListener("click", dismiss, true), 0);
+      document.addEventListener("keydown", onKey, true);
+      window.addEventListener("scroll", dismiss, true);
+    }
+    return { menu, cleanup, show };
+  }
   // ━━━━━━━━━━ src/ui/download-menu.js ━━━━━━━━━━
 
   function buildDownloadOptions(id) {
@@ -1738,39 +1983,10 @@
   }
 
   function showDownloadMenu(anchorEl, beatmapId) {
-    const existing = document.getElementById("osu-fav-dl-menu");
-    const reopening = existing && existing._anchor === anchorEl;
-    if (existing && existing._cleanup) existing._cleanup();
-    if (reopening) return;
-
+    const popup = createPopupMenu(anchorEl, "osu-fav-dl-menu", "min-width:180px;max-width:240px;");
+    if (!popup) return;
+    const { menu, cleanup, show } = popup;
     const options = buildDownloadOptions(beatmapId);
-    const menu = document.createElement("div");
-    menu.id = "osu-fav-dl-menu";
-    menu._anchor = anchorEl;
-    menu.style.cssText =
-      "position:fixed;z-index:100002;min-width:180px;max-width:240px;" +
-      "background:#1a1a1a;border:1px solid #333;border-radius:4px;" +
-      "box-shadow:0 4px 16px rgba(0,0,0,.5);padding:4px;" +
-      "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif";
-
-    function cleanup() {
-      menu.remove();
-      document.removeEventListener("click", onOutsideClick, true);
-      document.removeEventListener("keydown", onKey, true);
-      window.removeEventListener("scroll", onWindowScroll, true);
-    }
-    function onOutsideClick(e) {
-      if (menu.contains(e.target)) return;
-      cleanup();
-    }
-    function onKey(e) {
-      if (e.key === "Escape") cleanup();
-    }
-    function onWindowScroll(e) {
-      if (menu.contains(e.target)) return;
-      cleanup();
-    }
-    menu._cleanup = cleanup;
 
     if (options.length === 0) {
       const empty = document.createElement("div");
@@ -1800,20 +2016,7 @@
       });
     }
 
-    document.body.appendChild(menu);
-
-    const rect = anchorEl.getBoundingClientRect();
-    const menuRect = menu.getBoundingClientRect();
-    let top = rect.bottom + 4;
-    if (top + menuRect.height > window.innerHeight) top = Math.max(8, rect.top - menuRect.height - 4);
-    let left = rect.right - menuRect.width;
-    left = Math.max(8, Math.min(left, window.innerWidth - menuRect.width - 8));
-    menu.style.top = top + "px";
-    menu.style.left = left + "px";
-
-    setTimeout(() => document.addEventListener("click", onOutsideClick, true), 0);
-    document.addEventListener("keydown", onKey, true);
-    window.addEventListener("scroll", onWindowScroll, true);
+    show();
   }
 
   // ━━━━━━━━━━ src/ui/genre-filter.js ━━━━━━━━━━
@@ -1866,41 +2069,12 @@
   const DEFAULT_CAP_FILTERED = 150;
 
   function showFilterMenu(anchorEl, config, currentState, onApply) {
-    const existing = document.getElementById(MENU_ID);
-    const reopening = existing && existing._anchor === anchorEl;
-    if (existing && existing._cleanup) existing._cleanup();
-    if (reopening) return;
+    const popup = createPopupMenu(anchorEl, MENU_ID, "min-width:190px;max-width:240px;max-height:360px;overflow-y:auto;");
+    if (!popup) return;
+    const { menu, cleanup, show } = popup;
 
     const state = Object.assign({}, currentState);
     let sections = config.collect() || [];
-
-    const menu = document.createElement("div");
-    menu.id = MENU_ID;
-    menu._anchor = anchorEl;
-    menu.style.cssText =
-      "position:fixed;z-index:100002;min-width:190px;max-width:240px;max-height:360px;overflow-y:auto;" +
-      "background:#1a1a1a;border:1px solid #333;border-radius:4px;" +
-      "box-shadow:0 4px 16px rgba(0,0,0,.5);padding:4px;" +
-      "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif";
-
-    function cleanup() {
-      menu.remove();
-      document.removeEventListener("click", onOutsideClick, true);
-      document.removeEventListener("keydown", onKey, true);
-      window.removeEventListener("scroll", onWindowScroll, true);
-    }
-    function onOutsideClick(e) {
-      if (menu.contains(e.target)) return;
-      cleanup();
-    }
-    function onKey(e) {
-      if (e.key === "Escape") cleanup();
-    }
-    function onWindowScroll(e) {
-      if (menu.contains(e.target)) return;
-      cleanup();
-    }
-    menu._cleanup = cleanup;
 
     const hint = document.createElement("div");
     hint.style.cssText = "font-size:9px;color:#666;padding:2px 6px 6px;line-height:1.4";
@@ -2072,18 +2246,7 @@
       menu.appendChild(clearBtn);
     }
 
-    document.body.appendChild(menu);
-    const rect = anchorEl.getBoundingClientRect();
-    const menuRect = menu.getBoundingClientRect();
-    let top = rect.bottom + 4;
-    if (top + menuRect.height > window.innerHeight) top = Math.max(8, rect.top - menuRect.height - 4);
-    const left = Math.max(8, Math.min(rect.left, window.innerWidth - menuRect.width - 8));
-    menu.style.top = top + "px";
-    menu.style.left = left + "px";
-
-    setTimeout(() => document.addEventListener("click", onOutsideClick, true), 0);
-    document.addEventListener("keydown", onKey, true);
-    window.addEventListener("scroll", onWindowScroll, true);
+    show({ alignLeft: true });
   }
 
   function closeFilterMenu() {
@@ -2367,38 +2530,9 @@
   // ━━━━━━━━━━ src/ui/collections-menu.js ━━━━━━━━━━
 
   function showCollectionsMenu(anchorEl, activeId, onSelect) {
-    const existing = document.getElementById("osu-fav-cols-menu");
-    const reopening = existing && existing._anchor === anchorEl;
-    if (existing && existing._cleanup) existing._cleanup();
-    if (reopening) return;
-
-    const menu = document.createElement("div");
-    menu.id = "osu-fav-cols-menu";
-    menu._anchor = anchorEl;
-    menu.style.cssText =
-      "position:fixed;z-index:100002;min-width:190px;max-width:240px;max-height:320px;overflow-y:auto;" +
-      "background:#1a1a1a;border:1px solid #333;border-radius:4px;" +
-      "box-shadow:0 4px 16px rgba(0,0,0,.5);padding:4px;" +
-      "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif";
-
-    function cleanup() {
-      menu.remove();
-      document.removeEventListener("click", onOutsideClick, true);
-      document.removeEventListener("keydown", onKey, true);
-      window.removeEventListener("scroll", onWindowScroll, true);
-    }
-    function onOutsideClick(e) {
-      if (menu.contains(e.target)) return;
-      cleanup();
-    }
-    function onKey(e) {
-      if (e.key === "Escape") cleanup();
-    }
-    function onWindowScroll(e) {
-      if (menu.contains(e.target)) return;
-      cleanup();
-    }
-    menu._cleanup = cleanup;
+    const popup = createPopupMenu(anchorEl, "osu-fav-cols-menu", "min-width:190px;max-width:240px;max-height:320px;overflow-y:auto;");
+    if (!popup) return;
+    const { menu, cleanup, show } = popup;
 
     function renderRows() {
       menu.innerHTML = "";
@@ -2507,54 +2641,13 @@
     }
     renderRows();
 
-    document.body.appendChild(menu);
-    const rect = anchorEl.getBoundingClientRect();
-    const menuRect = menu.getBoundingClientRect();
-    let top = rect.bottom + 4;
-    if (top + menuRect.height > window.innerHeight) top = Math.max(8, rect.top - menuRect.height - 4);
-    let left = rect.right - menuRect.width;
-    left = Math.max(8, Math.min(left, window.innerWidth - menuRect.width - 8));
-    menu.style.top = top + "px";
-    menu.style.left = left + "px";
-
-    setTimeout(() => document.addEventListener("click", onOutsideClick, true), 0);
-    document.addEventListener("keydown", onKey, true);
-    window.addEventListener("scroll", onWindowScroll, true);
+    show();
   }
 
   function showAddToCollectionMenu(anchorEl, mapId, onChange) {
-    const existing = document.getElementById("osu-fav-col-menu");
-    const reopening = existing && existing._anchor === anchorEl;
-    if (existing && existing._cleanup) existing._cleanup();
-    if (reopening) return;
-
-    const menu = document.createElement("div");
-    menu.id = "osu-fav-col-menu";
-    menu._anchor = anchorEl;
-    menu.style.cssText =
-      "position:fixed;z-index:100002;min-width:180px;max-width:240px;max-height:320px;overflow-y:auto;" +
-      "background:#1a1a1a;border:1px solid #333;border-radius:4px;" +
-      "box-shadow:0 4px 16px rgba(0,0,0,.5);padding:4px;" +
-      "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif";
-
-    function cleanup() {
-      menu.remove();
-      document.removeEventListener("click", onOutsideClick, true);
-      document.removeEventListener("keydown", onKey, true);
-      window.removeEventListener("scroll", onWindowScroll, true);
-    }
-    function onOutsideClick(e) {
-      if (menu.contains(e.target)) return;
-      cleanup();
-    }
-    function onKey(e) {
-      if (e.key === "Escape") cleanup();
-    }
-    function onWindowScroll(e) {
-      if (menu.contains(e.target)) return;
-      cleanup();
-    }
-    menu._cleanup = cleanup;
+    const popup = createPopupMenu(anchorEl, "osu-fav-col-menu", "min-width:180px;max-width:240px;max-height:320px;overflow-y:auto;");
+    if (!popup) return;
+    const { menu, show } = popup;
 
     function renderRows() {
       menu.innerHTML = "";
@@ -2632,19 +2725,7 @@
     }
     renderRows();
 
-    document.body.appendChild(menu);
-    const rect = anchorEl.getBoundingClientRect();
-    const menuRect = menu.getBoundingClientRect();
-    let top = rect.bottom + 4;
-    if (top + menuRect.height > window.innerHeight) top = Math.max(8, rect.top - menuRect.height - 4);
-    let left = rect.right - menuRect.width;
-    left = Math.max(8, Math.min(left, window.innerWidth - menuRect.width - 8));
-    menu.style.top = top + "px";
-    menu.style.left = left + "px";
-
-    setTimeout(() => document.addEventListener("click", onOutsideClick, true), 0);
-    document.addEventListener("keydown", onKey, true);
-    window.addEventListener("scroll", onWindowScroll, true);
+    show();
   }
   // ━━━━━━━━━━ src/api/gist-backup.js ━━━━━━━━━━
 
@@ -2710,17 +2791,39 @@
     });
   }
 
+  function ghGistVisibility(gist) {
+    if (!gist || typeof gist.public !== "boolean") return null;
+    return gist.public ? "public" : "private";
+  }
+
+  function ghAdoptGist(gist) {
+    if (!gist || !gist.id) return null;
+    GM_setValue(GH_GIST_ID_KEY, gist.id);
+    GM_setValue(GH_GIST_URL_KEY, gist.html_url || "");
+    const visibility = ghGistVisibility(gist);
+    if (visibility) GM_setValue(GH_PRIVACY_KEY, visibility);
+    return visibility;
+  }
+
+  function ghDetectGistVisibility(token, gistId) {
+    return ghApiRequest("GET", "/gists/" + gistId, token).then((gist) => {
+      const visibility = ghGistVisibility(gist);
+      if (visibility) GM_setValue(GH_PRIVACY_KEY, visibility);
+      return visibility;
+    });
+  }
+
   function ghCreateGist(token, favs, isPublic) {
     return ghApiRequest("POST", "/gists", token, {
       description: "osu! Local Favorites backup",
       public: isPublic,
-      files: { [GIST_FILENAME]: { content: JSON.stringify(favs, null, 2) } },
+      files: { [GIST_FILENAME]: { content: serializeFavorites(favs) } },
     });
   }
 
   function ghUpdateGist(token, gistId, favs) {
     return ghApiRequest("PATCH", "/gists/" + gistId, token, {
-      files: { [GIST_FILENAME]: { content: JSON.stringify(favs, null, 2) } },
+      files: { [GIST_FILENAME]: { content: serializeFavorites(favs) } },
     });
   }
 
@@ -2937,16 +3040,6 @@
     _osuApiCache.set(path, data);
   }
 
-  function osuApiGetUsername() {
-    const cached = GM_getValue(OSU_API_USERNAME_KEY, "");
-    if (cached) return Promise.resolve(cached);
-    return osuApiGet("/me").then((me) => {
-      const name = (me && me.username) || "";
-      if (name) GM_setValue(OSU_API_USERNAME_KEY, name);
-      return name;
-    });
-  }
-
   function osuApiDisconnect() {
     GM_setValue(OSU_API_TOKEN_KEY, null);
     GM_setValue(OSU_API_USERNAME_KEY, "");
@@ -2979,33 +3072,7 @@
   function osuApiFetchBeatmapset(beatmapId) {
     return osuApiGet("/beatmapsets/" + beatmapId).then((bm) => {
       if (!bm || !bm.id) throw new Error("beatmapset not found");
-      const sid = String(bm.id);
-      return {
-        id: sid,
-        artist: bm.artist || "",
-        artist_unicode: bm.artist_unicode || bm.artist || "",
-        title: bm.title || "",
-        title_unicode: bm.title_unicode || bm.title || "",
-        creator: bm.creator || "",
-        user_id: String(bm.user_id || ""),
-        covers: bm.covers || {},
-        status: bm.status || "",
-        favourite_count: bm.favourite_count || 0,
-        play_count: bm.play_count || 0,
-        bpm: bm.bpm || 0,
-        source: bm.source || "",
-        tags: bm.tags || "",
-        genre: typeof bm.genre === "string" ? bm.genre : ((bm.genre && bm.genre.name) || ""),
-        language: typeof bm.language === "string" ? bm.language : ((bm.language && bm.language.name) || ""),
-        url: "https://osu.ppy.sh/beatmapsets/" + sid,
-        favourited_at: new Date().toISOString(),
-        is_artist_featured:
-          typeof bm.is_artist_featured === "boolean"
-            ? bm.is_artist_featured
-            : (bm.track_id != null ? !!bm.track_id : null),
-        nsfw: !!bm.nsfw,
-        preview: "https://b.ppy.sh/preview/" + sid + ".mp3",
-      };
+      return normalizeBeatmapset(bm, null);
     });
   }
 
@@ -3017,13 +3084,16 @@
     const isPublic = GM_getValue(GH_PRIVACY_KEY, "private") === "public";
 
     const createAndLink = () => ghCreateGist(token, favs, isPublic).then((gist) => {
-        GM_setValue(GH_GIST_ID_KEY, gist.id);
-        GM_setValue(GH_GIST_URL_KEY, gist.html_url || "");
+        ghAdoptGist(gist);
         return gist;
       });
 
     const p = gistId
-      ? ghUpdateGist(token, gistId, favs).catch((err) => {
+      ? ghUpdateGist(token, gistId, favs).then((gist) => {
+        const visibility = ghGistVisibility(gist);
+        if (visibility) GM_setValue(GH_PRIVACY_KEY, visibility);
+        return gist;
+      }).catch((err) => {
         if (!err || err.status !== 404) throw err;
         GM_setValue(GH_GIST_ID_KEY, "");
         GM_setValue(GH_GIST_URL_KEY, "");
@@ -3056,38 +3126,43 @@
   }
   // ━━━━━━━━━━ src/data/beatmap-extraction.js ━━━━━━━━━━
 
+  function normalizeBeatmapset(bm, featuredFallback) {
+    const id = String(bm.id);
+    const named = (v) => (typeof v === "string" ? v : (v && v.name) || "");
+    return {
+      id,
+      artist: bm.artist || "",
+      artist_unicode: bm.artist_unicode || bm.artist || "",
+      title: bm.title || "",
+      title_unicode: bm.title_unicode || bm.title || "",
+      creator: bm.creator || "",
+      user_id: String(bm.user_id || ""),
+      covers: bm.covers || {},
+      status: bm.status || "",
+      favourite_count: bm.favourite_count || 0,
+      play_count: bm.play_count || 0,
+      bpm: bm.bpm || 0,
+      source: bm.source || "",
+      tags: bm.tags || "",
+      genre: named(bm.genre),
+      language: named(bm.language),
+      url: "https://osu.ppy.sh/beatmapsets/" + id,
+      favourited_at: new Date().toISOString(),
+      is_artist_featured:
+        typeof bm.is_artist_featured === "boolean"
+          ? bm.is_artist_featured
+          : (bm.track_id != null ? !!bm.track_id : featuredFallback),
+      nsfw: !!bm.nsfw,
+      preview: "https://b.ppy.sh/preview/" + id + ".mp3",
+    };
+  }
+
   function getBeatmapDataFromJSON() {
     try {
       const el = document.getElementById("json-beatmapset");
       if (!el) return null;
       const raw = JSON.parse(el.textContent);
-      const bm = raw.beatmapset || raw;
-      return {
-        id: String(bm.id),
-        artist: bm.artist || "",
-        artist_unicode: bm.artist_unicode || bm.artist || "",
-        title: bm.title || "",
-        title_unicode: bm.title_unicode || bm.title || "",
-        creator: bm.creator || "",
-        user_id: String(bm.user_id || ""),
-        covers: bm.covers || {},
-        status: bm.status || "",
-        favourite_count: bm.favourite_count || 0,
-        play_count: bm.play_count || 0,
-        bpm: bm.bpm || 0,
-        source: bm.source || "",
-        tags: bm.tags || "",
-        genre: (bm.genre && bm.genre.name) || "",
-        language: (bm.language && bm.language.name) || "",
-        url: "https://osu.ppy.sh/beatmapsets/" + bm.id,
-        favourited_at: new Date().toISOString(),
-        is_artist_featured:
-          typeof bm.is_artist_featured === "boolean"
-            ? bm.is_artist_featured
-            : (bm.track_id != null ? !!bm.track_id : false),
-        nsfw: bm.nsfw || false,
-        preview: "https://b.ppy.sh/preview/" + bm.id + ".mp3",
-      };
+      return normalizeBeatmapset(raw.beatmapset || raw, false);
     } catch (e) {
       return null;
     }
@@ -4092,6 +4167,8 @@
   }
   // ━━━━━━━━━━ src/ui/settings.js ━━━━━━━━━━
 
+  const _visibilityChecked = new Set();
+
   function showToast(msg) {
     showOsuFavToast(msg, "380px");
   }
@@ -4450,8 +4527,7 @@
       wrap.appendChild(backupRow);
 
       exportBtn.addEventListener("click", () => {
-        const data = JSON.stringify(getFavorites(), null, 2);
-        const blob = new Blob([data], { type: "application/json" });
+        const blob = new Blob([serializeFavorites(getFavorites())], { type: "application/json" });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
         a.download = `osu-favorites-${new Date().toISOString().slice(0, 10)}.json`;
@@ -4760,9 +4836,8 @@
               GM_setValue(GH_USERNAME_KEY, user.login);
               return ghFindExistingGist(t).then((found) => {
                 if (found) {
-                  GM_setValue(GH_GIST_ID_KEY, found.id);
-                  GM_setValue(GH_GIST_URL_KEY, found.html_url || "");
-                  showToast("Connected - linked existing backup gist");
+                  const visibility = ghAdoptGist(found);
+                  showToast("Connected - linked existing " + (visibility ? visibility + " " : "") + "backup gist");
                 } else {
                   showToast("Connected as " + user.login);
                 }
@@ -4846,6 +4921,7 @@
           GM_setValue(GH_TOKEN_KEY, "");
           GM_setValue(GH_USERNAME_KEY, "");
           GM_setValue(GH_AUTO_BACKUP_KEY, false);
+          _visibilityChecked.clear();
           showToast("Disconnected from GitHub");
           renderSettingsView();
           updateFooterStatus();
@@ -4863,6 +4939,7 @@
         );
 
         const privacy = GM_getValue(GH_PRIVACY_KEY, "private");
+        const linkedGistId = GM_getValue(GH_GIST_ID_KEY, "");
         const privacyControl = makeSegmented(
           [
             { value: "private", label: "Private" },
@@ -4870,19 +4947,43 @@
           ],
           privacy,
           (val) => {
+            const gistToCheck = GM_getValue(GH_GIST_ID_KEY, "");
             GM_setValue(GH_PRIVACY_KEY, val);
-            const existingGistId = GM_getValue(GH_GIST_ID_KEY, "");
-            if (existingGistId) {
-              GM_setValue(GH_GIST_ID_KEY, "");
-              GM_setValue(GH_GIST_URL_KEY, "");
-              showToast("Visibility changed - a new gist will be created on next backup");
-              renderSettingsView();
-            }
+            if (!gistToCheck) return;
+            ghDetectGistVisibility(token, gistToCheck)
+              .then((actual) => {
+                GM_setValue(GH_PRIVACY_KEY, val);
+                if (actual === val) {
+                  showToast("This gist is already " + val + " - nothing to change");
+                  return;
+                }
+                GM_setValue(GH_GIST_ID_KEY, "");
+                GM_setValue(GH_GIST_URL_KEY, "");
+                showToast("Visibility changed - a new " + val + " gist will be created on next backup");
+                renderSettingsView();
+              })
+              .catch(() => {
+                GM_setValue(GH_GIST_ID_KEY, "");
+                GM_setValue(GH_GIST_URL_KEY, "");
+                showToast("Visibility changed - a new gist will be created on next backup");
+                renderSettingsView();
+              });
           },
         );
         wrap.appendChild(
-          settingsRow("Gist visibility", privacyControl, "GitHub can't change visibility later, so switching creates a new gist"),
+          settingsRow("Gist visibility", privacyControl, "Detected from the linked gist. GitHub can't change visibility later, so switching creates a new gist"),
         );
+
+        if (linkedGistId && !_visibilityChecked.has(linkedGistId)) {
+          _visibilityChecked.add(linkedGistId);
+          ghDetectGistVisibility(token, linkedGistId)
+            .then((actual) => {
+              if (actual && actual !== privacy) renderSettingsView();
+            })
+            .catch(() => {
+              _visibilityChecked.delete(linkedGistId);
+            });
+        }
 
         const actionRow = document.createElement("div");
         actionRow.style.cssText = "display:flex;gap:6px;margin-top:10px";
@@ -5138,7 +5239,8 @@
         "reopening the panel doesn't re-request them. Songs are written as they stream, so " +
         "a track that was interrupted half-way resumes instead of downloading again; a " +
         "fully cached song then plays from disk with no network request at all. \"Never\" " +
-        "turns this off entirely; \"Always\" keeps a cached copy until you clear it below.";
+        "turns this off entirely; \"Always\" keeps a cached copy until you clear it below, or " +
+        "until the size limit is reached (the oldest copies are dropped first).";
       wrap.appendChild(cacheHint);
 
       const cacheDurationControl = makeDropdown(
@@ -5185,16 +5287,63 @@
         wrap.appendChild(settingsRow("Custom duration (minutes)", customInput));
       }
 
+      const cacheSizeControl = makeDropdown(
+        [
+          { value: "custom", label: "Custom..." },
+          { value: "100mb", label: "100 MB" },
+          { value: "250mb", label: "250 MB" },
+          { value: "512mb", label: "512 MB" },
+          { value: "1gb", label: "1 GB" },
+          { value: "2gb", label: "2 GB" },
+          { value: "5gb", label: "5 GB" },
+          { value: "unlimited", label: "Unlimited" },
+        ],
+        cacheSizeMode(),
+        (val) => {
+          GM_setValue(CACHE_SIZE_KEY, val);
+          pruneMediaCache(true).then(() => refreshCacheStats());
+          renderSettingsView();
+        },
+      );
+      wrap.appendChild(
+        settingsRow(
+          "Cache size limit",
+          cacheSizeControl,
+          "When the cache grows past this, the oldest copies are removed first",
+        ),
+      );
+
+      if (cacheSizeMode() === "custom") {
+        const customSizeInput = document.createElement("input");
+        customSizeInput.type = "number";
+        customSizeInput.min = "10";
+        customSizeInput.step = "10";
+        customSizeInput.value = String(cacheSizeCustomMb());
+        customSizeInput.style.cssText =
+          "width:70px;background:#111;border:1px solid #333;border-radius:3px;color:#ddd;" +
+          "font-size:10px;font-family:inherit;padding:4px 6px;flex-shrink:0";
+        customSizeInput.addEventListener("change", () => {
+          const n = Math.max(10, Math.round(Number(customSizeInput.value) || 512));
+          customSizeInput.value = String(n);
+          GM_setValue(CACHE_SIZE_CUSTOM_MB_KEY, n);
+          pruneMediaCache(true).then(() => refreshCacheStats());
+        });
+        wrap.appendChild(settingsRow("Custom size limit (MB)", customSizeInput));
+      }
+
       const cacheStatsText = document.createElement("div");
       cacheStatsText.style.cssText = "font-size:10px;color:#666;margin:4px 0 8px";
       cacheStatsText.textContent = "Checking cache size…";
       wrap.appendChild(cacheStatsText);
-      cacheStats().then(({ count, bytes, partialBytes }) => {
-        const partialNote = partialBytes ? ` (+${formatCacheBytes(partialBytes)} in progress)` : "";
-        cacheStatsText.textContent = count || partialBytes
-          ? `${count} item${count === 1 ? "" : "s"} cached, ${formatCacheBytes(bytes)}${partialNote}`
-          : "Nothing cached yet";
-      });
+      function refreshCacheStats() {
+        cacheStats().then(({ count, bytes, partialBytes }) => {
+          const partialNote = partialBytes ? ` (+${formatCacheBytes(partialBytes)} in progress)` : "";
+          cacheStatsText.textContent = count || partialBytes
+            ? `${count} item${count === 1 ? "" : "s"} cached, ${formatCacheBytes(bytes)}${partialNote}`
+            : "Nothing cached yet";
+        });
+      }
+      refreshCacheStats();
 
       const clearCacheBtn = makeBtn("Clear cache", "width:100%;box-sizing:border-box;text-align:center;padding:6px");
       clearCacheBtn.addEventListener("click", () => {
@@ -6008,16 +6157,6 @@
       if (audio._npProgressBar) audio._npProgressBar.style.width = "0%";
     }
 
-    function getPlaybackCover(f, id) {
-      const stored = f && f.covers && (
-        f.covers.card ||
-        f.covers["card@2x"] ||
-        f.covers.list ||
-        f.covers.cover
-      );
-      return stored || (id ? `https://assets.ppy.sh/beatmaps/${id}/covers/card.jpg` : "");
-    }
-
     function startPlayback(id, f, opts = {}) {
       const { navigated = false, direction = 1, skipAttempt = 0 } = opts;
       const audio = ensureAudio();
@@ -6038,7 +6177,7 @@
       audio._npCurrentTitle = f.title || f.title_unicode || "Unknown";
       audio._npCurrentArtist = f.artist || f.artist_unicode || "";
 
-      const playbackCover = getPlaybackCover(f, id);
+      const playbackCover = favoriteCoverUrl(f, id);
       setMediaSessionMetadata(audio);
       if (audio._npThumb) {
         if (playbackCover) {
@@ -6255,7 +6394,7 @@
       npTitle.textContent = npAudio._npCurrentTitle || "";
       npArtist.textContent = npAudio._npCurrentArtist || "";
       const currentFav = getFavorites()[npAudio._npCurrentId];
-      const currentCover = getPlaybackCover(currentFav, npAudio._npCurrentId);
+      const currentCover = favoriteCoverUrl(currentFav, npAudio._npCurrentId);
       if (currentCover) {
         npThumb.src = currentCover;
         npThumb.style.visibility = "visible";
@@ -6434,12 +6573,7 @@
         );
         card.addEventListener("mouseleave", () => (card.style.background = ""));
 
-        const coverUrl =
-          (f.covers || {}).card ||
-          (f.covers || {})["card@2x"] ||
-          (f.covers || {}).list ||
-          (f.covers || {}).cover ||
-          "";
+        const coverUrl = favoriteCoverUrl(f, id);
         const coverEl = document.createElement("div");
         coverEl.style.cssText =
           "position:relative;width:56px;height:42px;border-radius:2px;overflow:hidden;flex-shrink:0;background:#1a1a1a;display:flex;align-items:center;justify-content:center;cursor:pointer";

@@ -19,8 +19,7 @@ The script adds a **View Local Favorites** option in the Tampermonkey menu. Clic
 
 For a duration, seek timeline, and playback progress in Android's system media notification or lock screen, use **Firefox for Android 156 or newer**. Older Firefox Android releases expose track artwork and play/pause controls but do not pass a web page's Media Session position state through to Android, so the system player shows `00:00 — 00:00`. Mozilla enabled the timeline support in Firefox 156 ([bug 2063332](https://bugzilla.mozilla.org/show_bug.cgi?id=2063332)).
 
-### Browser Extensions
-
+Browser Extensions
 > **Heavily deprecated browser extension** 
 this is behind by about 2.0.3 major releases [122 commits behind check here](https://github.com/starhollow2008/Local-osu-favorites/compare/v3.4.2...main)
 > The old browser-extension build (`manifest.json`, `content.js`, `popup.*`, `background.js`, etc.) is no longer maintained or included in this repository - only the archived v3.4.2 release below still has those files. All active development happens on the Tampermonkey userscript.
@@ -34,53 +33,17 @@ For Firefox
 1. Download `osu-favorites-extension.xpi` from the [last extension release](https://github.com/starhollow2008/Local-osu-favorites/releases/tag/v3.4.2) (.xpi file)
 2. To install it in Firefox go to `about:debugging` → `This Firefox` → `Load Temporary Add-on` → pick the .xpi file*(temporary - it will be removed after browser restart)*
 
-### Or clone the repo and load it directly
-```bash
-git clone https://github.com/starhollow2008/Local-osu-favorites.git
-```
-
-Then load the folder in `chrome://extensions/`.
-
-### Build manually
-
-The Tampermonkey userscript is generated from the modules under `src/`, so edit
-those - never `dist/osu-local-favorites.user.js`, which is overwritten on every
-build. There are no dependencies; plain Node is enough.
-
-```bash
-git clone https://github.com/starhollow2008/Local-osu-favorites.git
-cd Local-osu-favorites
-node build/build.js
-```
-
-| command | what it does |
-| --- | --- |
-| `node build/build.js` | checks the wiring, then bundles `src/` into `dist/` |
-| `node build/build.js --check` | check only, writes nothing |
-| `node build/build.js --check --strict` | same, but heuristic warnings also fail the build |
-
-A successful build writes two files:
-
-| file | what it is |
-| --- | --- |
-| `dist/osu-local-favorites.user.js` | the userscript users install - plain code, no comments |
-| `dist/comments.md` | every comment that was removed, linked to the line it came from |
-
-To try an unreleased build, open `dist/osu-local-favorites.user.js` in
-Tampermonkey (or drag it onto the extensions page) after running the build.
-
-Adding a module is four steps: create the file under the right `src/` folder,
-`export` what other modules need and `import` what you use, add it to `order`
-in `build/modules.json` (so anything it reads at load time comes earlier), then
-re-run `node build/build.js`.
+Or clone the repo and load it directly:```git clone https://github.com/starhollow2008/Local-osu-favorites.git``` Then load the folder in `chrome://extensions/`.
 
 ## Side Panel Demo
 
 Search, sort, preview, and download every favorite without leaving the panel - including per-map access to any download mirrors you've enabled.
 
-| Side panel | Inline preview & download mirrors |
-| :---: | :---: |
-| ![Side panel open on an osu! profile page](screenshots/sidepanel.png) | ![Per-map download mirror dropdown](screenshots/music_preview_and_downloads.png) |
+| Side panel |
+| :---: |
+| ![Side panel](screenshots/sidepanel.png) |
+| Inline preview & download mirrors |
+| ![Music previews and download options](screenshots/music_preview_and_downloads.png) |
 
 ### Settings
 
@@ -88,7 +51,7 @@ Everything below lives behind the ⚙ **Settings** button in the side panel head
 
 <table>
   <tr>
-    <td width="33%" valign="top"><img src="screenshots/settings_full.png" width="100%" alt="The whole Settings pane"></td>
+    <td width="33%" valign="top"><img src="screenshots/settings_full.png" width="100%" alt="Settings panel"></td>
     <td valign="top">
       <ul>
         <li><strong>Backup &amp; Restore</strong> - export your whole library to a JSON file, or import one back in (merges, skips duplicates)</li>
@@ -110,23 +73,12 @@ Everything below lives behind the ⚙ **Settings** button in the side panel head
   </tr>
 </table>
 
-## The heart on a beatmap
+
+## If you go onto a beatmap that is favorited you will see the heart icon has changed its color
 
 | Normally | On a favorited beatmap |
 | :---: | :---: |
 | ![Floating heart](screenshots/button.png) | ![Floating heart (favorited)](screenshots/button_active.png) |
-
-## Automatic updates
-
-The script checks GitHub for a newer version and offers the update in two places - a prompt in the
-corner of the page, and an overlay inside the panel when you next open it.
-
-| Page-level prompt | In-panel prompt |
-| :---: | :---: |
-| ![Update prompt in the corner of the page](screenshots/autoupdate_prompt.png) | ![Update overlay inside the side panel](screenshots/autoupdate_prompt_panel.png) |
-
-*The version number in these screenshots is whatever the current release is, not necessarily what is
-shown here.*
 
 ## How it works
 
@@ -135,8 +87,12 @@ shown here.*
 - Stores favorites locally via `GM_setValue`/`GM_getValue`, with an optional encrypted-in-transit backup to a GitHub Gist
 - Floating heart button in the bottom-right corner of every osu! page
 - A side panel (☰ from the floating heart, or **View Local Favorites** in the Tampermonkey menu) to browse, search, sort, play previews, download, and manage everything
-- Periodically checks GitHub for a newer script version and shows a prompt when one's available
+- Periodically checks GitHub for a newer script version and shows an in-panel prompt when one's available
 - Its accent(glow) and colour of the heart itself can be changed by accent and heart border/fill color
+
+![Update prompt](screenshots/autoupdate_prompt.png)
+
+*Example screenshot - the version number and exact wording will reflect whatever the actual latest release is, not necessarily what's shown here.*
 
 ## Features
 
@@ -152,9 +108,7 @@ shown here.*
 
 | File | Purpose |
 |------|---------|
-| `dist/osu-local-favorites.user.js` | The Tampermonkey userscript - this *is* the extension (generated, do not edit) |
-| `src/` | The modules the userscript is built from |
-| `build/` | The bundler and its five build gates |
+| `osu-local-favorites.user.js` | The Tampermonkey userscript - this *is* the extension |
 | `icons/` | Icons used in the panel header and browser toolbar |
 | `screenshots/` | Images used in this README |
 | `LICENSE` | MIT license |
@@ -164,7 +118,7 @@ shown here.*
 - Purely local by default - favorites don't sync between devices unless you export/import or connect GitHub Gist backup
 - Gist backup requires a GitHub personal access token with `gist` scope, stored locally by Tampermonkey - treat it like any other credential
 - Download mirrors (Beatconnect, NeriNyan, Sayobot, Mino) are third-party services, not affiliated with or endorsed by osu! - they're off by default except Beatconnect and NeriNyan; enable/disable them in Settings
-- Only works on `osu.ppy.sh`, and only where osu! itself shows a favorite heart (beatmap pages, listing cards, and profile sections)
+- Only works on `osu.ppy.sh` beatmap pages
 - May need updates if osu! changes their page layout
 
 ## License

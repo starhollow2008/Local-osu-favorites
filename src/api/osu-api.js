@@ -1,13 +1,14 @@
-import { GH_AUTO_BACKUP_KEY, GH_GIST_ID_KEY, GH_GIST_URL_KEY, GH_LAST_SYNC_KEY, GH_PRIVACY_KEY, GH_TOKEN_KEY, OSU_API_CLIENT_ID_KEY, OSU_API_CLIENT_SECRET_KEY, OSU_API_REDIRECT_URI, OSU_API_STATE_KEY, OSU_API_TOKEN_KEY, OSU_API_USERNAME_KEY, ghCreateGist, ghUpdateGist } from "./gist-backup.js";
+import { GH_AUTO_BACKUP_KEY, GH_GIST_ID_KEY, GH_GIST_URL_KEY, GH_LAST_SYNC_KEY, GH_PRIVACY_KEY, GH_TOKEN_KEY, OSU_API_CLIENT_ID_KEY, OSU_API_CLIENT_SECRET_KEY, OSU_API_REDIRECT_URI, OSU_API_STATE_KEY, OSU_API_TOKEN_KEY, OSU_API_USERNAME_KEY, ghAdoptGist, ghCreateGist, ghGistVisibility, ghUpdateGist } from "./gist-backup.js";
 import { reportError } from "../core/errors.js";
 import { GM_getValue, GM_setValue } from "../core/gm-shim.js";
 import { showOsuFavToast } from "../core/toast.js";
 import { getFavorites } from "../data/storage.js";
+import { normalizeBeatmapset } from "../data/beatmap-extraction.js";
 
 // ═══ osu! API v2 - OAuth2 authorization-code flow ═══
 // Same mechanism standard osu! extensions use: the user creates an OAuth
 // application on their osu! account settings (new OAuth app), enters its
-// Client ID + Client Secret in Local Favorites' settings, and registers exactly
+// Client ID + Client Secret in LOF's settings, and registers exactly
 // https://osu.ppy.sh/home as the callback URL. The script
 // then drives the full flow itself:
 //   1. osuApiStartAuth()      → navigates to /oauth/authorize with a random state
@@ -234,16 +235,6 @@ function _osuApiCacheSet(path, data) {
   _osuApiCache.set(path, data);
 }
 
-function osuApiGetUsername() {
-  const cached = GM_getValue(OSU_API_USERNAME_KEY, "");
-  if (cached) return Promise.resolve(cached);
-  return osuApiGet("/me").then((me) => {
-    const name = (me && me.username) || "";
-    if (name) GM_setValue(OSU_API_USERNAME_KEY, name);
-    return name;
-  });
-}
-
 export function osuApiDisconnect() {
   GM_setValue(OSU_API_TOKEN_KEY, null);
   GM_setValue(OSU_API_USERNAME_KEY, "");
@@ -276,49 +267,26 @@ export function osuApiHandleOAuthCallback() {
   } catch (e) { /* never break page load over this */ }
 }
 
-// Fetches a beatmapset through the API v2 and normalizes it into Local Favorites'
+// Fetches a beatmapset through the API v2 and normalizes it into LOF's
 // stored-favorite shape (identical fields to getBeatmapDataFromJSON - the
 // website's embedded JSON is basically the same object as the API payload).
 export function osuApiFetchBeatmapset(beatmapId) {
   return osuApiGet("/beatmapsets/" + beatmapId).then((bm) => {
     if (!bm || !bm.id) throw new Error("beatmapset not found");
-    const sid = String(bm.id);
-    return {
-      id: sid,
-      artist: bm.artist || "",
-      artist_unicode: bm.artist_unicode || bm.artist || "",
-      title: bm.title || "",
-      title_unicode: bm.title_unicode || bm.title || "",
-      creator: bm.creator || "",
-      user_id: String(bm.user_id || ""),
-      covers: bm.covers || {},
-      status: bm.status || "",
-      favourite_count: bm.favourite_count || 0,
-      play_count: bm.play_count || 0,
-      bpm: bm.bpm || 0,
-      source: bm.source || "",
-      tags: bm.tags || "",
-      genre: typeof bm.genre === "string" ? bm.genre : ((bm.genre && bm.genre.name) || ""),
-      language: typeof bm.language === "string" ? bm.language : ((bm.language && bm.language.name) || ""),
-      url: "https://osu.ppy.sh/beatmapsets/" + sid,
-      favourited_at: new Date().toISOString(),
-      // The API does not always include the featured-artist marker. `null`
-      // means "not supplied" so enrichment can preserve a known value from
-      // the existing favorite instead of turning it off during re-enrichment.
-      is_artist_featured:
-        typeof bm.is_artist_featured === "boolean"
-          ? bm.is_artist_featured
-          : (bm.track_id != null ? !!bm.track_id : null),
-      nsfw: !!bm.nsfw,
-      preview: "https://b.ppy.sh/preview/" + sid + ".mp3",
-    };
+    // The API does not always include the featured-artist marker. `null`
+    // means "not supplied" so enrichment can preserve a known value from
+    // the existing favorite instead of turning it off during re-enrichment.
+    return normalizeBeatmapset(bm, null);
   });
 }
 
 // Creates the backup gist on first run, otherwise updates the linked one.
 // Note: GitHub does not allow flipping a gist's public/private flag after
-// creation, so a privacy change clears GH_GIST_ID_KEY and this naturally
-// creates a fresh gist with the new visibility on the next call.
+// creation, so a genuine privacy change (confirmed against the linked gist's
+// real visibility in Settings) clears GH_GIST_ID_KEY and this naturally
+// creates a fresh gist with the new visibility on the next call. Every
+// create/update response is also used to keep the stored visibility setting
+// equal to what the linked gist actually is.
 export function performGistBackup() {
   const token = GM_getValue(GH_TOKEN_KEY, "");
   if (!token) return Promise.reject(new Error("Not connected to GitHub"));
@@ -327,13 +295,16 @@ export function performGistBackup() {
   const isPublic = GM_getValue(GH_PRIVACY_KEY, "private") === "public";
 
   const createAndLink = () => ghCreateGist(token, favs, isPublic).then((gist) => {
-      GM_setValue(GH_GIST_ID_KEY, gist.id);
-      GM_setValue(GH_GIST_URL_KEY, gist.html_url || "");
+      ghAdoptGist(gist);
       return gist;
     });
 
   const p = gistId
-    ? ghUpdateGist(token, gistId, favs).catch((err) => {
+    ? ghUpdateGist(token, gistId, favs).then((gist) => {
+      const visibility = ghGistVisibility(gist);
+      if (visibility) GM_setValue(GH_PRIVACY_KEY, visibility);
+      return gist;
+    }).catch((err) => {
       // A user can delete the linked gist directly on GitHub. Treat its 404
       // as a stale local link, create a replacement, and relink it so both
       // manual and automatic backups recover on the same attempt.

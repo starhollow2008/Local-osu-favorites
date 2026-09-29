@@ -6,7 +6,7 @@ import { collectionsContainingMap, getCollections } from "../data/collections.js
 import { _blobUrlCache, cacheDurationMode, getKnownCachedBlob, hasFreshCachedCopy, lookupCachedBlob, prewarmCachedPreview, resolveCachedMediaUrl, startStreamingCacheWrite } from "../data/media-cache-db.js";
 import { resolveDefaultMirror } from "../data/mirrors.js";
 import { MUSIC_LOOP_KEY, MUSIC_SHUFFLE_KEY, musicLoopEnabled, musicShuffleEnabled } from "../data/playback-settings.js";
-import { getFavorites, setFavorites } from "../data/storage.js";
+import { favoriteCoverUrl, getFavorites, setFavorites } from "../data/storage.js";
 import { autoUpdateChecksEnabled, checkVersionUpdate, getCurrentVersion, isNewerVersion } from "../data/version-check.js";
 import { ensureAudio } from "./audio-player.js";
 import { clearMediaSession, setMediaSessionMetadata } from "./media-session.js";
@@ -691,19 +691,6 @@ export function showFavoritesPanel() {
     if (audio._npProgressBar) audio._npProgressBar.style.width = "0%";
   }
 
-  function getPlaybackCover(f, id) {
-    const stored = f && f.covers && (
-      f.covers.card ||
-      f.covers["card@2x"] ||
-      f.covers.list ||
-      f.covers.cover
-    );
-    // Older local favorites may not have a stored covers object. Fall back to
-    // osu!'s deterministic beatmapset cover URL so the mini-player still gets
-    // artwork even for those entries.
-    return stored || (id ? `https://assets.ppy.sh/beatmaps/${id}/covers/card.jpg` : "");
-  }
-
   // Starts a track by id/record, linking up whichever card is currently
   // on screen for it (if any - long lists build cards lazily) and the
   // Now Playing bar. `navigated` marks a track reached via Back/Next/
@@ -735,7 +722,7 @@ export function showFavoritesPanel() {
     audio._npCurrentTitle = f.title || f.title_unicode || "Unknown";
     audio._npCurrentArtist = f.artist || f.artist_unicode || "";
 
-    const playbackCover = getPlaybackCover(f, id);
+    const playbackCover = favoriteCoverUrl(f, id);
     setMediaSessionMetadata(audio);
     // Don't drop playbackState to "none" here: this runs on every track
     // handoff (including auto-next while backgrounded), and the load()
@@ -1058,7 +1045,7 @@ export function showFavoritesPanel() {
     npTitle.textContent = npAudio._npCurrentTitle || "";
     npArtist.textContent = npAudio._npCurrentArtist || "";
     const currentFav = getFavorites()[npAudio._npCurrentId];
-    const currentCover = getPlaybackCover(currentFav, npAudio._npCurrentId);
+    const currentCover = favoriteCoverUrl(currentFav, npAudio._npCurrentId);
     if (currentCover) {
       npThumb.src = currentCover;
       npThumb.style.visibility = "visible";
@@ -1281,12 +1268,7 @@ export function showFavoritesPanel() {
       card.addEventListener("mouseleave", () => (card.style.background = ""));
 
       // Cover
-      const coverUrl =
-        (f.covers || {}).card ||
-        (f.covers || {})["card@2x"] ||
-        (f.covers || {}).list ||
-        (f.covers || {}).cover ||
-        "";
+      const coverUrl = favoriteCoverUrl(f, id);
       const coverEl = document.createElement("div");
       coverEl.style.cssText =
         "position:relative;width:56px;height:42px;border-radius:2px;overflow:hidden;flex-shrink:0;background:#1a1a1a;display:flex;align-items:center;justify-content:center;cursor:pointer";

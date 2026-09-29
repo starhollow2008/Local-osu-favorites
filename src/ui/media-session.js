@@ -19,10 +19,6 @@ function mediaSession() {
   return "mediaSession" in navigator && navigator.mediaSession ? navigator.mediaSession : null;
 }
 
-export function mediaSessionAvailable() {
-  return mediaSession() !== null;
-}
-
 // osu!'s canonical cover renditions and their real pixel dimensions.
 // Supplying `sizes` lets the OS pick the right rendition instead of
 // downloading whichever one happens to be listed first - Android's

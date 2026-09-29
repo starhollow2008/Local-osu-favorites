@@ -17,7 +17,7 @@ const HINAI_MUSIC_API_BASE = "https://mirror.hinamizawa.ai/v3/osu/music";
 // browser media requests control their own forbidden User-Agent header,
 // while the metadata request below is made through GM_xmlhttpRequest.
 const HINAI_MUSIC_USER_AGENT =
-  "Local-osu-favorites https://github.com/starhollow2008/Local-osu-favorites";
+  "osu-Local-Favorites https://github.com/starhollow2008/Local-osu-favorites";
 const _hinaiSongRequests = new Map(); // beatmapset id -> Promise<Song|null>
 
 // Firefox for Android on some devices (including Redmi models) is much

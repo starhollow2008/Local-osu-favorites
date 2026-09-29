@@ -1,4 +1,4 @@
-import { GH_AUTO_BACKUP_KEY, GH_GIST_ID_KEY, GH_GIST_URL_KEY, GH_LAST_SYNC_KEY, GH_PRIVACY_KEY, GH_TOKEN_KEY, GH_USERNAME_KEY, OSU_API_CLIENT_ID_KEY, OSU_API_CLIENT_SECRET_KEY, OSU_API_USERNAME_KEY, ghFindExistingGist, ghGetGistContent, ghGetUser, parseGistId } from "../api/gist-backup.js";
+import { GH_AUTO_BACKUP_KEY, GH_GIST_ID_KEY, GH_GIST_URL_KEY, GH_LAST_SYNC_KEY, GH_PRIVACY_KEY, GH_TOKEN_KEY, GH_USERNAME_KEY, OSU_API_CLIENT_ID_KEY, OSU_API_CLIENT_SECRET_KEY, OSU_API_USERNAME_KEY, ghAdoptGist, ghDetectGistVisibility, ghFindExistingGist, ghGetGistContent, ghGetUser, parseGistId } from "../api/gist-backup.js";
 import { osuApiDisconnect, osuApiIsConnected, osuApiStartAuth, performGistBackup, scheduleAutoBackup } from "../api/osu-api.js";
 import { PREVIEW_FULLSONG_KEY, fullSongPreviewsEnabled } from "../api/previews.js";
 import { reportError } from "../core/errors.js";
@@ -6,14 +6,18 @@ import { GM_getValue, GM_setValue } from "../core/gm-shim.js";
 import { showOsuFavToast } from "../core/toast.js";
 import { getCollections, setCollections } from "../data/collections.js";
 import { addManyToEnrichQueue, ensureEnrichDrainerRunning, getEnrichQueue } from "../data/enrichment.js";
-import { CACHE_CUSTOM_MINUTES_KEY, CACHE_DURATION_KEY, cacheClearAll, cacheCustomMinutes, cacheDurationMode, cacheStats, formatCacheBytes } from "../data/media-cache-db.js";
+import { CACHE_CUSTOM_MINUTES_KEY, CACHE_DURATION_KEY, CACHE_SIZE_CUSTOM_MB_KEY, CACHE_SIZE_KEY, cacheClearAll, cacheCustomMinutes, cacheDurationMode, cacheSizeCustomMb, cacheSizeMode, cacheStats, formatCacheBytes, pruneMediaCache } from "../data/media-cache-db.js";
 import { DL_DEFAULT_MIRROR_KEY, DL_SOURCE_PREF_KEY, DL_VIDEO_PREF_KEY, MIRRORS, getAllDownloadDestinations, isMirrorEnabled } from "../data/mirrors.js";
 import { MUSIC_AUTONEXT_KEY, MUSIC_LOOP_KEY, MUSIC_SHUFFLE_KEY, MUSIC_VOLUME_KEY, musicAutoNextEnabled, musicLoopEnabled, musicShuffleEnabled, musicVolumePct } from "../data/playback-settings.js";
 import { cancelGlobalReenrichment, isReenrichRunning, runGlobalReenrichment, updateReenrichmentUI } from "../data/reenrichment.js";
-import { getFavorites, setFavorites } from "../data/storage.js";
+import { getFavorites, serializeFavorites, setFavorites } from "../data/storage.js";
 import { AUTO_UPDATE_CHECK_KEY, autoUpdateChecksEnabled, checkVersionUpdate, getCurrentVersion } from "../data/version-check.js";
 import { updateFloatingHeart } from "./floating-heart.js";
 import { THEME_ACCENT_KEY, THEME_ACTIVE_OPACITY_KEY, THEME_DEFAULTS, THEME_HEART_KEY, THEME_HOVER_DIM_KEY, THEME_IDLE_DIM_KEY, THEME_IDLE_OPACITY_KEY, applyTheme, getThemeSettings } from "./theme.js";
+
+// Gist ids whose real visibility was already checked against GitHub this page
+// load (see the Gist visibility row) - keeps the autodetect to one request.
+const _visibilityChecked = new Set();
 
 // ═══ Settings view (⚙ in the panel header) ═══
 // Everything the ⚙ pane is made of: the scroll container, the control
@@ -435,8 +439,7 @@ export function createSettingsView(deps) {
     wrap.appendChild(backupRow);
 
     exportBtn.addEventListener("click", () => {
-      const data = JSON.stringify(getFavorites(), null, 2);
-      const blob = new Blob([data], { type: "application/json" });
+      const blob = new Blob([serializeFavorites(getFavorites())], { type: "application/json" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = `osu-favorites-${new Date().toISOString().slice(0, 10)}.json`;
@@ -769,9 +772,8 @@ export function createSettingsView(deps) {
             GM_setValue(GH_USERNAME_KEY, user.login);
             return ghFindExistingGist(t).then((found) => {
               if (found) {
-                GM_setValue(GH_GIST_ID_KEY, found.id);
-                GM_setValue(GH_GIST_URL_KEY, found.html_url || "");
-                showToast("Connected - linked existing backup gist");
+                const visibility = ghAdoptGist(found);
+                showToast("Connected - linked existing " + (visibility ? visibility + " " : "") + "backup gist");
               } else {
                 showToast("Connected as " + user.login);
               }
@@ -858,6 +860,7 @@ export function createSettingsView(deps) {
         GM_setValue(GH_TOKEN_KEY, "");
         GM_setValue(GH_USERNAME_KEY, "");
         GM_setValue(GH_AUTO_BACKUP_KEY, false);
+        _visibilityChecked.clear();
         showToast("Disconnected from GitHub");
         renderSettingsView();
         updateFooterStatus();
@@ -875,6 +878,7 @@ export function createSettingsView(deps) {
       );
 
       const privacy = GM_getValue(GH_PRIVACY_KEY, "private");
+      const linkedGistId = GM_getValue(GH_GIST_ID_KEY, "");
       const privacyControl = makeSegmented(
         [
           { value: "private", label: "Private" },
@@ -882,19 +886,58 @@ export function createSettingsView(deps) {
         ],
         privacy,
         (val) => {
+          const gistToCheck = GM_getValue(GH_GIST_ID_KEY, "");
           GM_setValue(GH_PRIVACY_KEY, val);
-          const existingGistId = GM_getValue(GH_GIST_ID_KEY, "");
-          if (existingGistId) {
-            GM_setValue(GH_GIST_ID_KEY, "");
-            GM_setValue(GH_GIST_URL_KEY, "");
-            showToast("Visibility changed - a new gist will be created on next backup");
-            renderSettingsView();
-          }
+          if (!gistToCheck) return;
+          // GitHub cannot change a gist's visibility after creation, so a
+          // new gist is only needed when the linked one is genuinely the
+          // other kind. Ask GitHub instead of trusting the stored value,
+          // which can be stale (a gist linked before visibility was
+          // tracked, or one changed from another device).
+          ghDetectGistVisibility(token, gistToCheck)
+            .then((actual) => {
+              // The detection call overwrites the stored setting with the
+              // gist's real visibility; put the user's choice back before
+              // deciding what it means.
+              GM_setValue(GH_PRIVACY_KEY, val);
+              if (actual === val) {
+                showToast("This gist is already " + val + " - nothing to change");
+                return;
+              }
+              GM_setValue(GH_GIST_ID_KEY, "");
+              GM_setValue(GH_GIST_URL_KEY, "");
+              showToast("Visibility changed - a new " + val + " gist will be created on next backup");
+              renderSettingsView();
+            })
+            .catch(() => {
+              // Could not verify (offline, token problem). Fall back to the
+              // previous behaviour of assuming the change is real, so the
+              // choice is never silently ignored.
+              GM_setValue(GH_GIST_ID_KEY, "");
+              GM_setValue(GH_GIST_URL_KEY, "");
+              showToast("Visibility changed - a new gist will be created on next backup");
+              renderSettingsView();
+            });
         },
       );
       wrap.appendChild(
-        settingsRow("Gist visibility", privacyControl, "GitHub can't change visibility later, so switching creates a new gist"),
+        settingsRow("Gist visibility", privacyControl, "Detected from the linked gist. GitHub can't change visibility later, so switching creates a new gist"),
       );
+
+      // Autodetect: once per linked gist per page load, ask GitHub what the
+      // gist really is and show that. Re-renders only when the stored value
+      // was wrong, so a correct setting never flickers.
+      if (linkedGistId && !_visibilityChecked.has(linkedGistId)) {
+        _visibilityChecked.add(linkedGistId);
+        ghDetectGistVisibility(token, linkedGistId)
+          .then((actual) => {
+            if (actual && actual !== privacy) renderSettingsView();
+          })
+          .catch(() => {
+            // Unknown: leave the setting alone and allow a retry next time.
+            _visibilityChecked.delete(linkedGistId);
+          });
+      }
 
       const actionRow = document.createElement("div");
       actionRow.style.cssText = "display:flex;gap:6px;margin-top:10px";
@@ -1156,7 +1199,8 @@ export function createSettingsView(deps) {
       "reopening the panel doesn't re-request them. Songs are written as they stream, so " +
       "a track that was interrupted half-way resumes instead of downloading again; a " +
       "fully cached song then plays from disk with no network request at all. \"Never\" " +
-      "turns this off entirely; \"Always\" keeps a cached copy until you clear it below.";
+      "turns this off entirely; \"Always\" keeps a cached copy until you clear it below, or " +
+      "until the size limit is reached (the oldest copies are dropped first).";
     wrap.appendChild(cacheHint);
 
     const cacheDurationControl = makeDropdown(
@@ -1203,16 +1247,63 @@ export function createSettingsView(deps) {
       wrap.appendChild(settingsRow("Custom duration (minutes)", customInput));
     }
 
+    const cacheSizeControl = makeDropdown(
+      [
+        { value: "custom", label: "Custom..." },
+        { value: "100mb", label: "100 MB" },
+        { value: "250mb", label: "250 MB" },
+        { value: "512mb", label: "512 MB" },
+        { value: "1gb", label: "1 GB" },
+        { value: "2gb", label: "2 GB" },
+        { value: "5gb", label: "5 GB" },
+        { value: "unlimited", label: "Unlimited" },
+      ],
+      cacheSizeMode(),
+      (val) => {
+        GM_setValue(CACHE_SIZE_KEY, val);
+        pruneMediaCache(true).then(() => refreshCacheStats());
+        renderSettingsView(); // reveal/hide the custom-size row below
+      },
+    );
+    wrap.appendChild(
+      settingsRow(
+        "Cache size limit",
+        cacheSizeControl,
+        "When the cache grows past this, the oldest copies are removed first",
+      ),
+    );
+
+    if (cacheSizeMode() === "custom") {
+      const customSizeInput = document.createElement("input");
+      customSizeInput.type = "number";
+      customSizeInput.min = "10";
+      customSizeInput.step = "10";
+      customSizeInput.value = String(cacheSizeCustomMb());
+      customSizeInput.style.cssText =
+        "width:70px;background:#111;border:1px solid #333;border-radius:3px;color:#ddd;" +
+        "font-size:10px;font-family:inherit;padding:4px 6px;flex-shrink:0";
+      customSizeInput.addEventListener("change", () => {
+        const n = Math.max(10, Math.round(Number(customSizeInput.value) || 512));
+        customSizeInput.value = String(n);
+        GM_setValue(CACHE_SIZE_CUSTOM_MB_KEY, n);
+        pruneMediaCache(true).then(() => refreshCacheStats());
+      });
+      wrap.appendChild(settingsRow("Custom size limit (MB)", customSizeInput));
+    }
+
     const cacheStatsText = document.createElement("div");
     cacheStatsText.style.cssText = "font-size:10px;color:#666;margin:4px 0 8px";
     cacheStatsText.textContent = "Checking cache size…";
     wrap.appendChild(cacheStatsText);
-    cacheStats().then(({ count, bytes, partialBytes }) => {
-      const partialNote = partialBytes ? ` (+${formatCacheBytes(partialBytes)} in progress)` : "";
-      cacheStatsText.textContent = count || partialBytes
-        ? `${count} item${count === 1 ? "" : "s"} cached, ${formatCacheBytes(bytes)}${partialNote}`
-        : "Nothing cached yet";
-    });
+    function refreshCacheStats() {
+      cacheStats().then(({ count, bytes, partialBytes }) => {
+        const partialNote = partialBytes ? ` (+${formatCacheBytes(partialBytes)} in progress)` : "";
+        cacheStatsText.textContent = count || partialBytes
+          ? `${count} item${count === 1 ? "" : "s"} cached, ${formatCacheBytes(bytes)}${partialNote}`
+          : "Nothing cached yet";
+      });
+    }
+    refreshCacheStats();
 
     const clearCacheBtn = makeBtn("Clear cache", "width:100%;box-sizing:border-box;text-align:center;padding:6px");
     clearCacheBtn.addEventListener("click", () => {

@@ -29,6 +29,7 @@
     "data/media-cache-db.js",
     "ui/media-session.js",
     "ui/audio-player.js",
+    "ui/popup-menu.js",
     "ui/download-menu.js",
     "ui/genre-filter.js",
     "ui/filter-menu.js",

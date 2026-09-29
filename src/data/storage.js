@@ -167,3 +167,23 @@ export function isFavorited(id) {
   return !!getFavorites()[id];
 }
 
+// Cover art is resolved from the id when a record carries no `covers`, so
+// exports leave the object out (its URLs only differ by a cache-buster).
+export function favoriteCoverUrl(f, id) {
+  const c = (f && f.covers) || {};
+  return c.card || c["card@2x"] || c.list || c.cover ||
+    (id ? `https://assets.ppy.sh/beatmaps/${id}/covers/card.jpg` : "");
+}
+
+// The JSON written by Export and the Gist backup: same records as storage
+// minus what is rebuilt on load (`covers`) or empty (`source`, `tags`).
+export function serializeFavorites(favs) {
+  const slim = {};
+  for (const [id, { covers, ...rest }] of Object.entries(favs)) {
+    if (!rest.source) delete rest.source;
+    if (!rest.tags) delete rest.tags;
+    slim[id] = rest;
+  }
+  return JSON.stringify(slim, null, 2);
+}
+

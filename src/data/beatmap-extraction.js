@@ -1,36 +1,45 @@
 // ═══ Beatmap data extraction ═══
+// Turns a beatmapset object (the page's embedded JSON or an API v2 response)
+// into the stored-favorite shape. `featuredFallback` is what
+// is_artist_featured becomes when the source doesn't say: the page path
+// passes false, the API path passes null so enrichment can keep a known value.
+export function normalizeBeatmapset(bm, featuredFallback) {
+  const id = String(bm.id);
+  const named = (v) => (typeof v === "string" ? v : (v && v.name) || "");
+  return {
+    id,
+    artist: bm.artist || "",
+    artist_unicode: bm.artist_unicode || bm.artist || "",
+    title: bm.title || "",
+    title_unicode: bm.title_unicode || bm.title || "",
+    creator: bm.creator || "",
+    user_id: String(bm.user_id || ""),
+    covers: bm.covers || {},
+    status: bm.status || "",
+    favourite_count: bm.favourite_count || 0,
+    play_count: bm.play_count || 0,
+    bpm: bm.bpm || 0,
+    source: bm.source || "",
+    tags: bm.tags || "",
+    genre: named(bm.genre),
+    language: named(bm.language),
+    url: "https://osu.ppy.sh/beatmapsets/" + id,
+    favourited_at: new Date().toISOString(),
+    is_artist_featured:
+      typeof bm.is_artist_featured === "boolean"
+        ? bm.is_artist_featured
+        : (bm.track_id != null ? !!bm.track_id : featuredFallback),
+    nsfw: !!bm.nsfw,
+    preview: "https://b.ppy.sh/preview/" + id + ".mp3",
+  };
+}
+
 export function getBeatmapDataFromJSON() {
   try {
     const el = document.getElementById("json-beatmapset");
     if (!el) return null;
     const raw = JSON.parse(el.textContent);
-    const bm = raw.beatmapset || raw;
-    return {
-      id: String(bm.id),
-      artist: bm.artist || "",
-      artist_unicode: bm.artist_unicode || bm.artist || "",
-      title: bm.title || "",
-      title_unicode: bm.title_unicode || bm.title || "",
-      creator: bm.creator || "",
-      user_id: String(bm.user_id || ""),
-      covers: bm.covers || {},
-      status: bm.status || "",
-      favourite_count: bm.favourite_count || 0,
-      play_count: bm.play_count || 0,
-      bpm: bm.bpm || 0,
-      source: bm.source || "",
-      tags: bm.tags || "",
-      genre: (bm.genre && bm.genre.name) || "",
-      language: (bm.language && bm.language.name) || "",
-      url: "https://osu.ppy.sh/beatmapsets/" + bm.id,
-      favourited_at: new Date().toISOString(),
-      is_artist_featured:
-        typeof bm.is_artist_featured === "boolean"
-          ? bm.is_artist_featured
-          : (bm.track_id != null ? !!bm.track_id : false),
-      nsfw: bm.nsfw || false,
-      preview: "https://b.ppy.sh/preview/" + bm.id + ".mp3",
-    };
+    return normalizeBeatmapset(raw.beatmapset || raw, false);
   } catch (e) {
     return null;
   }

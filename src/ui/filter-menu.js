@@ -1,3 +1,5 @@
+import { createPopupMenu } from "./popup-menu.js";
+
 // ── Generic filter popover ──
 // One popover implementation shared by every toolbar filter (Date, Title,
 // Artist, Status, Genre). It was previously written once, inline, for the
@@ -40,43 +42,12 @@ const DEFAULT_CAP_UNFILTERED = 60;
 const DEFAULT_CAP_FILTERED = 150;
 
 export function showFilterMenu(anchorEl, config, currentState, onApply) {
-  const existing = document.getElementById(MENU_ID);
-  const reopening = existing && existing._anchor === anchorEl;
-  if (existing && existing._cleanup) existing._cleanup();
-  if (reopening) return; // second tap on the same button closes it
+  const popup = createPopupMenu(anchorEl, MENU_ID, "min-width:190px;max-width:240px;max-height:360px;overflow-y:auto;");
+  if (!popup) return;
+  const { menu, cleanup, show } = popup;
 
   const state = Object.assign({}, currentState);
   let sections = config.collect() || [];
-
-  const menu = document.createElement("div");
-  menu.id = MENU_ID;
-  menu._anchor = anchorEl;
-  menu.style.cssText =
-    "position:fixed;z-index:100002;min-width:190px;max-width:240px;max-height:360px;overflow-y:auto;" +
-    "background:#1a1a1a;border:1px solid #333;border-radius:4px;" +
-    "box-shadow:0 4px 16px rgba(0,0,0,.5);padding:4px;" +
-    "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif";
-
-  function cleanup() {
-    menu.remove();
-    document.removeEventListener("click", onOutsideClick, true);
-    document.removeEventListener("keydown", onKey, true);
-    window.removeEventListener("scroll", onWindowScroll, true);
-  }
-  function onOutsideClick(e) {
-    if (menu.contains(e.target)) return;
-    cleanup();
-  }
-  function onKey(e) {
-    if (e.key === "Escape") cleanup();
-  }
-  // Only close on a scroll that moves the menu's anchor out from under it
-  // (page/panel scroll) - a scroll *inside* the menu itself must not close it.
-  function onWindowScroll(e) {
-    if (menu.contains(e.target)) return;
-    cleanup();
-  }
-  menu._cleanup = cleanup;
 
   const hint = document.createElement("div");
   hint.style.cssText = "font-size:9px;color:#666;padding:2px 6px 6px;line-height:1.4";
@@ -254,18 +225,7 @@ export function showFilterMenu(anchorEl, config, currentState, onApply) {
     menu.appendChild(clearBtn);
   }
 
-  document.body.appendChild(menu);
-  const rect = anchorEl.getBoundingClientRect();
-  const menuRect = menu.getBoundingClientRect();
-  let top = rect.bottom + 4;
-  if (top + menuRect.height > window.innerHeight) top = Math.max(8, rect.top - menuRect.height - 4);
-  const left = Math.max(8, Math.min(rect.left, window.innerWidth - menuRect.width - 8));
-  menu.style.top = top + "px";
-  menu.style.left = left + "px";
-
-  setTimeout(() => document.addEventListener("click", onOutsideClick, true), 0);
-  document.addEventListener("keydown", onKey, true);
-  window.addEventListener("scroll", onWindowScroll, true);
+  show({ alignLeft: true });
 }
 
 // Closes whichever filter popover is open, if any. Used when the panel is

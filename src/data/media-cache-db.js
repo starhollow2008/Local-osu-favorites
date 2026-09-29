@@ -53,6 +53,41 @@ const CACHE_STORE = "media";
 // store and everything already cached in it are left untouched.
 const CACHE_DB_VERSION = 2;
 const CHUNK_STORE = "media-chunks";
+// Housekeeping limits. Without them the store only ever grew: entries past
+// their TTL stayed on disk until the same URL happened to be fetched again,
+// half-downloaded tracks that were never replayed stayed forever, and "always"
+// had no ceiling at all. Full-length previews are several MB each, so this is
+// what keeps a long-lived install from quietly filling the browser's quota.
+// The size ceiling is a user setting (Settings -> Media Cache -> Cache size
+// limit): oldest entries are dropped past it.
+export const CACHE_SIZE_KEY = "osu_cache_max_size"; // "custom"|"100mb"|"250mb"|"512mb"|"1gb"|"2gb"|"5gb"|"unlimited"
+export const CACHE_SIZE_CUSTOM_MB_KEY = "osu_cache_max_size_custom_mb";
+const MB = 1024 * 1024;
+const CACHE_SIZES_MB = {
+  "100mb": 100,
+  "250mb": 250,
+  "512mb": 512,
+  "1gb": 1024,
+  "2gb": 2 * 1024,
+  "5gb": 5 * 1024,
+};
+export function cacheSizeMode() {
+  return GM_getValue(CACHE_SIZE_KEY, "512mb");
+}
+export function cacheSizeCustomMb() {
+  const n = Number(GM_getValue(CACHE_SIZE_CUSTOM_MB_KEY, 512));
+  return Number.isFinite(n) && n > 0 ? n : 512;
+}
+// Ceiling in bytes, or Infinity for "unlimited".
+function cacheMaxBytes() {
+  const mode = cacheSizeMode();
+  if (mode === "unlimited") return Infinity;
+  if (mode === "custom") return cacheSizeCustomMb() * MB;
+  return (CACHE_SIZES_MB[mode] || CACHE_SIZES_MB["512mb"]) * MB;
+}
+const CACHE_PRUNE_TARGET = 0.85; // ...down to this fraction, so it is not re-triggered every write
+const PARTIAL_MAX_AGE_MS = 24 * 60 * 60 * 1000; // abandoned half-downloads
+const PRUNE_MIN_INTERVAL_MS = 60 * 1000;
 let _cacheDbPromise = null;
 // URLs whose stored copy was discarded as unusable (see forgetCachedMedia).
 // A lookup that was already in flight when that happened must not put the
@@ -73,7 +108,12 @@ function openCacheDb() {
           req.result.createObjectStore(CHUNK_STORE, { keyPath: "key" });
         }
       };
-      req.onsuccess = () => resolve(req.result);
+      req.onsuccess = () => {
+        resolve(req.result);
+        // One sweep shortly after the first open of a page load, out of the
+        // way of startup work.
+        setTimeout(() => { pruneMediaCache().catch(() => {}); }, 10000);
+      };
       // Fail soft - callers treat a null db exactly like "cache
       // unavailable" and fall back to plain network URLs, same as if
       // caching were switched off.
@@ -99,16 +139,35 @@ function cacheGet(url) {
     });
   });
 }
+// One write, resolved when the transaction has actually committed. It used
+// to resolve as soon as put() was queued, so a failed write (quota, storage
+// pressure) was invisible to callers - who then deleted the partial chunks
+// and remembered the blob as cached even though nothing had been stored.
+function _putEntry(db, url, blob) {
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(CACHE_STORE, "readwrite");
+      tx.objectStore(CACHE_STORE).put({ url, blob, cachedAt: Date.now() });
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+      tx.onabort = () => resolve(false);
+    } catch (e) {
+      resolve(false);
+    }
+  });
+}
+// Resolves true only when the entry is really stored. A failed first attempt
+// is most often quota, so the oldest entries are dropped to make room and the
+// write is retried once.
 export function cachePut(url, blob) {
   return openCacheDb().then((db) => {
-    if (!db) return;
-    try {
-      // Fresh bytes are being written, so this URL is trustworthy again.
-      _forgotten.delete(url);
-      db.transaction(CACHE_STORE, "readwrite").objectStore(CACHE_STORE).put({ url, blob, cachedAt: Date.now() });
-    } catch (e) {
-      // Best-effort - a failed write just means no caching for this one item.
-    }
+    if (!db || !blob) return false;
+    // Fresh bytes are being written, so this URL is trustworthy again.
+    _forgotten.delete(url);
+    return _putEntry(db, url, blob).then((ok) => {
+      if (ok) return true;
+      return _makeRoom(db, blob.size).then((freed) => (freed ? _putEntry(db, url, blob) : false));
+    });
   });
 }
 export function cacheClearAll() {
@@ -136,6 +195,124 @@ export function cacheClearAll() {
     });
   });
 }
+function _getAllRows(db, storeName) {
+  return new Promise((resolve) => {
+    try {
+      const req = db.transaction(storeName, "readonly").objectStore(storeName).getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => resolve([]);
+    } catch (e) {
+      resolve([]);
+    }
+  });
+}
+function _deleteKeys(db, storeName, keys) {
+  if (!keys.length) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(storeName, "readwrite");
+      const store = tx.objectStore(storeName);
+      keys.forEach((k) => store.delete(k));
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+      tx.onabort = () => resolve(false);
+    } catch (e) {
+      resolve(false);
+    }
+  });
+}
+// Oldest-cached first, until `bytesToFree` is covered. An entry that still has
+// a live blob: URL (the playing track, covers on screen) is in use and is
+// skipped, so making room never pulls media out from under the UI.
+function _pickEvictions(rows, bytesToFree) {
+  const picked = [];
+  let freed = 0;
+  rows
+    .filter((r) => r && r.blob && !_blobUrlCache.has(r.url))
+    .sort((a, b) => (a.cachedAt || 0) - (b.cachedAt || 0))
+    .some((r) => {
+      picked.push(r.url);
+      freed += r.blob.size;
+      return freed >= bytesToFree;
+    });
+  return { picked, freed };
+}
+// Frees at least `bytes` by dropping the oldest entries. Resolves the number
+// of bytes actually freed (0 = nothing could be dropped).
+function _makeRoom(db, bytes) {
+  return _getAllRows(db, CACHE_STORE).then((rows) => {
+    const { picked, freed } = _pickEvictions(rows, Math.max(bytes || 0, 1));
+    picked.forEach((u) => _memBlobs.delete(u));
+    return _deleteKeys(db, CACHE_STORE, picked).then((ok) => (ok ? freed : 0));
+  });
+}
+
+// Housekeeping sweep: drops entries past their TTL, abandoned half-downloads
+// and, if the store is over CACHE_MAX_BYTES, the oldest entries. Throttled, and
+// safe to call as often as convenient (after each finished download, once
+// after the first open).
+let _lastPruneAt = 0;
+let _pruneRunning = null;
+// `force` skips the throttle - used when the user changes the size limit and
+// expects the store to shrink right away.
+export function pruneMediaCache(force) {
+  if (_pruneRunning) return _pruneRunning;
+  if (!force && Date.now() - _lastPruneAt < PRUNE_MIN_INTERVAL_MS) return Promise.resolve();
+  _lastPruneAt = Date.now();
+  _pruneRunning = openCacheDb()
+    .then((db) => {
+      if (!db) return;
+      return Promise.all([_getAllRows(db, CACHE_STORE), _getAllRows(db, CHUNK_STORE)]).then(([rows, chunkRows]) => {
+        const now = Date.now();
+        const mode = cacheDurationMode();
+        const ttl = mode === "never" ? Infinity : cacheDurationMs();
+
+        // 1. Entries past their TTL can never be served again.
+        const expired = rows.filter((r) => ttl !== Infinity && now - (r.cachedAt || 0) >= ttl && !_blobUrlCache.has(r.url));
+        const expiredSet = new Set(expired.map((r) => r.url));
+        expired.forEach((r) => _memBlobs.delete(r.url));
+
+        // 2. Half-downloads: abandoned (nothing written for a day), or left
+        // behind for a track whose complete copy is already stored. Rows from
+        // before chunks were timestamped count as abandoned.
+        const complete = new Set(rows.map((r) => r.url));
+        const byUrl = new Map();
+        chunkRows.forEach((r) => {
+          const g = byUrl.get(r.url) || { newest: 0, bytes: 0 };
+          g.newest = Math.max(g.newest, r.savedAt || 0);
+          g.bytes += r.blob ? r.blob.size : 0;
+          byUrl.set(r.url, g);
+        });
+        const dropChunkUrls = [];
+        let partialKept = 0;
+        byUrl.forEach((g, url) => {
+          const abandoned = now - g.newest >= PARTIAL_MAX_AGE_MS;
+          if ((abandoned || complete.has(url)) && !_activeStreamWrites.has(url)) dropChunkUrls.push(url);
+          else partialKept += g.bytes;
+        });
+
+        // 3. Size cap over what is left.
+        const remaining = rows.filter((r) => !expiredSet.has(r.url));
+        const total = remaining.reduce((n, r) => n + (r.blob ? r.blob.size : 0), 0) + partialKept;
+        let evicted = [];
+        const maxBytes = cacheMaxBytes();
+        if (maxBytes !== Infinity && total > maxBytes) {
+          evicted = _pickEvictions(remaining, total - maxBytes * CACHE_PRUNE_TARGET).picked;
+          evicted.forEach((u) => _memBlobs.delete(u));
+        }
+
+        const dropEntries = expired.map((r) => r.url).concat(evicted);
+        const chunkKeys = chunkRows.filter((r) => dropChunkUrls.indexOf(r.url) !== -1).map((r) => r.key);
+        return _deleteKeys(db, CACHE_STORE, dropEntries).then(() => _deleteKeys(db, CHUNK_STORE, chunkKeys));
+      });
+    })
+    .catch(() => {})
+    .then(() => {
+      _pruneRunning = null;
+    });
+  return _pruneRunning;
+}
+
 // Used by the Settings panel to show how much is currently stored.
 export function cacheStats() {
   return openCacheDb().then((db) => {
@@ -275,6 +452,40 @@ export function hasFreshCachedCopy(url) {
   });
 }
 
+// Background fill for covers (and anything else resolved through
+// resolveCachedMediaUrl). Every re-render (sort, filter, search, scroll) asks
+// for the same URLs again before the first download has finished, and a first
+// load of a big library asks for hundreds at once - so requests for the same
+// URL share one download, and only a few run at a time instead of flooding the
+// userscript manager with a request per card.
+const BG_FETCH_CONCURRENCY = 4;
+const _bgFetches = new Map(); // url -> Promise<boolean stored>
+const _bgWaiting = [];
+let _bgActive = 0;
+function _backgroundCacheFetch(url) {
+  const existing = _bgFetches.get(url);
+  if (existing) return existing;
+  const promise = new Promise((resolve) => {
+    const run = () => {
+      _bgActive++;
+      gmFetchBlob(url)
+        .then((blob) => (blob ? cachePut(url, blob) : false))
+        .catch(() => false)
+        .then((stored) => {
+          _bgActive--;
+          _bgFetches.delete(url);
+          const next = _bgWaiting.shift();
+          if (next) next();
+          resolve(stored);
+        });
+    };
+    if (_bgActive < BG_FETCH_CONCURRENCY) run();
+    else _bgWaiting.push(run);
+  });
+  _bgFetches.set(url, promise);
+  return promise;
+}
+
 // Resolves to a URL safe to hand straight to <img src> / <audio src>: a
 // local blob: URL when a fresh cached copy exists, otherwise the original
 // network URL unchanged - so a cache miss never delays first-time
@@ -296,9 +507,8 @@ export function resolveCachedMediaUrl(url) {
       return objUrl;
     }
 
-    gmFetchBlob(url).then((blob) => {
-      if (!blob) return;
-      cachePut(url, blob);
+    _backgroundCacheFetch(url).then((stored) => {
+      if (!stored) return;
       // The blob just changed (first fetch, or a re-fetch after the old
       // entry expired) - drop any object URL for the previous bytes so the
       // next resolve mints one for the new blob instead of quietly serving
@@ -523,12 +733,16 @@ function _deleteEntry(db, url) {
 function _wholeFileFallback(db, url) {
   return gmFetchBlob(url).then((blob) => {
     if (!blob) return false;
-    return cachePut(url, blob)
-      .then(() => _deleteChunks(db, url))
-      .then(() => {
+    return cachePut(url, blob).then((stored) => {
+      // Only a committed write may retire the partial chunks or count as
+      // cached; on a failed write they are still the best copy there is.
+      if (!stored) return false;
+      return _deleteChunks(db, url).then(() => {
         _rememberCachedBlob(url, blob);
+        pruneMediaCache();
         return true;
       });
+    });
   });
 }
 
@@ -566,19 +780,43 @@ async function _streamViaFetch(db, url, partial, isStillWanted, state) {
       : (partial.chunks.length ? partial.chunks[partial.chunks.length - 1].index + 1 : 0);
 
     const reader = response.body.getReader();
+    // One stored row per flush (~1 MB), not one per network packet: a
+    // multi-MB song used to become hundreds of tiny rows, each one read back
+    // and stitched together at the end.
     let pending = [];
     let pendingBytes = 0;
+    let received = 0;
+    let writeFailed = false;
     const flushPending = async () => {
-      if (!pending.length) return;
-      const batch = pending;
+      if (!pending.length || writeFailed) return;
+      const pieces = pending;
+      const size = pendingBytes;
       pending = [];
       pendingBytes = 0;
+      const index = nextIndex++;
+      const row = {
+        key: _chunkKey(url, index),
+        url,
+        index,
+        blob: new Blob(pieces, { type: contentType }),
+        contentType,
+        etag,
+        savedAt: Date.now(),
+      };
+      let ok = await _writeChunkRows(db, [row]);
+      // A failed batch leaves a hole, and everything after a hole would be
+      // spliced onto the wrong offset when the file is assembled - so retry
+      // once after making room, and otherwise stop with a clean prefix.
+      if (!ok && (await _makeRoom(db, size))) ok = await _writeChunkRows(db, [row]);
+      if (!ok) {
+        writeFailed = true;
+        return;
+      }
       wroteAnything = true;
-      await _writeChunkRows(db, batch);
     };
 
     for (;;) {
-      if (state.cancelled || !isStillWanted()) {
+      if (state.cancelled || !isStillWanted() || writeFailed) {
         controller.abort();
         await flushPending(); // keep what already arrived, for a resume later
         return false;
@@ -586,26 +824,30 @@ async function _streamViaFetch(db, url, partial, isStillWanted, state) {
       const { value, done } = await reader.read();
       if (done) break;
       if (!value || !value.byteLength) continue;
-      const index = nextIndex++;
-      pending.push({
-        key: _chunkKey(url, index),
-        url,
-        index,
-        blob: new Blob([value], { type: contentType }),
-        contentType,
-        etag,
-      });
+      pending.push(value);
       pendingBytes += value.byteLength;
+      received += value.byteLength;
       if (pendingBytes >= CHUNK_FLUSH_BYTES) await flushPending();
     }
     await flushPending();
+    if (writeFailed) return false;
+
+    // A connection that dies mid-body can end the stream without an error,
+    // which used to be cached as if the whole song had arrived - and a
+    // truncated MP3 still decodes, so it then played short forever. When the
+    // server declared a length (and nothing re-encoded the body), the bytes
+    // received must match it; otherwise the chunks stay for a resume.
+    const declared = Number(response.headers.get("content-length"));
+    if (declared > 0 && !response.headers.get("content-encoding") && received !== declared) return false;
 
     const total = await _readChunks(db, url);
     if (!total.chunks.length) return false;
     const blob = new Blob(total.chunks.map((r) => r.blob), { type: total.contentType || contentType });
-    await cachePut(url, blob);
+    // Chunks are only retired once the assembled copy is really stored.
+    if (!(await cachePut(url, blob))) return false;
     await _deleteChunks(db, url);
     _rememberCachedBlob(url, blob);
+    pruneMediaCache();
     return true;
   } catch (e) {
     if (state.cancelled) return false;
